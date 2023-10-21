@@ -8,7 +8,8 @@ import xml.etree.ElementTree as ET
 import requests
 from requests_ntlm import HttpNtlmAuth
 from ansible2snipe import (get_snipe_model_id, get_snipe_asset, clean_tag, create_snipe_asset, update_snipe_asset,
-                           checkout_snipe_asset, USER_ARGS, get_snipe_asset_by_name, CONFIG)
+                           checkout_snipe_asset, USER_ARGS, get_snipe_asset_by_name, CONFIG, clean_mac,
+                           get_snipe_asset_by_mac, clean_manufacturer)
 
 # Stat file
 try:
@@ -78,10 +79,10 @@ for entry in tree.findall('atom:entry', namespaces):
 
     properties = content.find('ns2:properties', namespaces)
     # Example
-    # <content type="application/xml">
+    # <content device_type="application/xml">
     # 	<m:properties>
     # 		<d:CollectionID>UOR00B7C</d:CollectionID>
-    # 		<d:Details_Table0_ResourceID m:type="Edm.Int32">16897059</d:Details_Table0_ResourceID>
+    # 		<d:Details_Table0_ResourceID m:device_type="Edm.Int32">16897059</d:Details_Table0_ResourceID>
     # 		<d:Details_Table0_ComputerName>ABCD123</d:Details_Table0_ComputerName>
     # 		<d:Details_Table0_DomainWorkgroup>DOMAIN</d:Details_Table0_DomainWorkgroup>
     # 		<d:Details_Table0_OU>domain/ou/ou/ou</d:Details_Table0_OU>
@@ -94,12 +95,12 @@ for entry in tree.findall('atom:entry', namespaces):
     # 		<d:Details_Table0_Manufacturer>Dell Inc.</d:Details_Table0_Manufacturer>
     # 		<d:Details_Table0_Model>Latitude 3450</d:Details_Table0_Model>
     # 		<d:Details_Table0_BIOS>A06</d:Details_Table0_BIOS>
-    # 		<d:Details_Table0_MemoryKBytes m:type="Edm.Int64">8294148</d:Details_Table0_MemoryKBytes>
+    # 		<d:Details_Table0_MemoryKBytes m:device_type="Edm.Int64">8294148</d:Details_Table0_MemoryKBytes>
     # 		<d:Processor_Name>Intel(R) Core(TM) i5-5300U CPU @ 2.30GHz</d:Processor_Name>
-    # 		<d:Details_Table0_ProcessorGHz m:type="Edm.Int32">2300</d:Details_Table0_ProcessorGHz>
-    # 		<d:Processor_Max_Clock_Speed m:type="Edm.Int32">2301</d:Processor_Max_Clock_Speed>
-    # 		<d:Details_Table0_DiskSpaceMB m:type="Edm.Int64">237302</d:Details_Table0_DiskSpaceMB>
-    # 		<d:Details_Table0_FreeDiskSpaceMB m:type="Edm.Int64">156451</d:Details_Table0_FreeDiskSpaceMB>
+    # 		<d:Details_Table0_ProcessorGHz m:device_type="Edm.Int32">2300</d:Details_Table0_ProcessorGHz>
+    # 		<d:Processor_Max_Clock_Speed m:device_type="Edm.Int32">2301</d:Processor_Max_Clock_Speed>
+    # 		<d:Details_Table0_DiskSpaceMB m:device_type="Edm.Int64">237302</d:Details_Table0_DiskSpaceMB>
+    # 		<d:Details_Table0_FreeDiskSpaceMB m:device_type="Edm.Int64">156451</d:Details_Table0_FreeDiskSpaceMB>
     # 	</m:properties>
     # </content>
     # Get Details_Table0_ResourceID
@@ -107,7 +108,7 @@ for entry in tree.findall('atom:entry', namespaces):
     serial_number = properties.find('ns2:Details_Table0_SerialNumber', namespaces).text
     resourceid = properties.find('ns2:Details_Table0_ResourceID', namespaces).text
     # Get Details_Table0_ComputerName
-    computer_name = properties.find('ns2:Details_Table0_ComputerName', namespaces).text
+    computer_name = properties.find('ns2:Details_Table0_ComputerName', namespaces).text.upper()
     # Get Details_Table0_Domain
     domain = properties.find(
         'ns2:Details_Table0_DomainWorkgroup', namespaces).text
@@ -118,17 +119,15 @@ for entry in tree.findall('atom:entry', namespaces):
         'ns2:Details_Table0_TopConsoleUser', namespaces).text
     # Get Details_Table0_OperatingSystem
     operating_system = properties.find(
-        'ns2:Details_Table0_OperatingSystem', namespaces).text
+        'ns2:Details_Table0_OperatingSystem', namespaces).text.replace("Microsoft ", "")
     # Get Details_Table0_ServicePackLevel
     service_pack_level = properties.find(
         'ns2:Details_Table0_ServicePackLevel', namespaces).text
 
     # Get Details_Table0_AssetTag
-    asset_tag = properties.find(
-        'ns2:Details_Table0_AssetTag', namespaces).text
+    asset_tag = clean_tag(properties.find('ns2:Details_Table0_AssetTag', namespaces).text)
     # Get Details_Table0_Manufacturer
-    manufacturer = properties.find(
-        'ns2:Details_Table0_Manufacturer', namespaces).text
+    manufacturer = clean_manufacturer(properties.find('ns2:Details_Table0_Manufacturer', namespaces).text)
     # Get Details_Table0_Model
     model = properties.find('ns2:Details_Table0_Model', namespaces).text
 
@@ -139,15 +138,6 @@ for entry in tree.findall('atom:entry', namespaces):
     # Get Details_Table0_DiskSpaceMB
     disk_space = properties.find('ns2:Details_Table0_DiskSpaceMB', namespaces).text
 
-    # Known broken things from SCCM
-    if manufacturer == "DELL__":
-        manufacturer = "Dell Inc."
-
-    # Coordinate with JAMF
-    if manufacturer == "Apple Inc.":
-        manufacturer = "Apple"
-
-    asset_tag = clean_tag(asset_tag)
     serial_number = clean_tag(serial_number)
 
     if not serial_number or str(serial_number).lower() == str(model).lower():
@@ -157,15 +147,6 @@ for entry in tree.findall('atom:entry', namespaces):
     if not asset_tag or str(asset_tag).lower() == str(model).lower():
         asset_tag = f"sccm-{resourceid}"
         logging.info(f"No asset tag for {computer_name}")
-
-    snipe_asset = get_snipe_asset(serial_number)
-    if snipe_asset['total'] == 0:
-        logging.info(f"Serial number {serial_number} not found in snipe. Checking for asset name.")
-        snipe_asset = get_snipe_asset_by_name(computer_name)
-
-    if snipe_asset['total'] > 1:
-        logging.error(f"Multiple assets found for {serial_number}")
-        continue
 
     if model:
         model = model.replace("Dell System ", "").replace("Dell ", "")
@@ -191,12 +172,25 @@ for entry in tree.findall('atom:entry', namespaces):
     details = tree2.find(f".//ns1:Detail[@Details_Table0_ComputerName='{computer_name}']", namespaces=namespaces)
 
     if details is not None:
+        macaddress = clean_mac(details.attrib['MAC_Address'])
+
+    snipe_asset = get_snipe_asset(serial_number)
+    if snipe_asset['total'] == 0:
+        logging.info(f"Serial number {serial_number} not found in snipe. Checking for asset name.")
+        snipe_asset = get_snipe_asset_by_name(computer_name)
+        if snipe_asset['total'] == 0 and macaddress:
+            snipe_asset = get_snipe_asset_by_mac(macaddress)
+
+    if snipe_asset['total'] > 1:
+        logging.error(f"Multiple assets found for {serial_number}")
+        continue
+
+    if details is not None:
         ipaddress = validate_ip(details.attrib['IP_Address'])
 
         if ipaddress:
             payload["_snipeit_ip_address_13"] = ipaddress
 
-        macaddress = details.attrib['MAC_Address']
         snipe_macaddress = []
         if 'custom_fields' in snipe_asset:
             snipe_macaddress[0] = snipe_asset['custom_fields']['MAC Address']['value']
@@ -204,7 +198,7 @@ for entry in tree.findall('atom:entry', namespaces):
             snipe_macaddress[2] = snipe_asset['custom_fields']['MAC Address 3']['value']
             snipe_macaddress[3] = snipe_asset['custom_fields']['MAC Address 4']['value']
 
-        if macaddress not in snipe_macaddress:
+        if macaddress and macaddress not in snipe_macaddress:
             if not snipe_macaddress:
                 payload['_snipeit_mac_address_1'] = macaddress
             elif not snipe_macaddress[0]:

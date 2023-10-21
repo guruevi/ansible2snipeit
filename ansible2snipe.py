@@ -28,6 +28,7 @@
 #       _snipeit_mac_address_1 = ansible_mac_address
 #       _snipeit_custom_name_1234567890 = ansible_dict ansible_key
 #
+import html
 from functools import lru_cache
 from time import sleep
 from typing import Any, Iterable
@@ -38,7 +39,7 @@ from configparser import RawConfigParser
 from argparse import ArgumentParser
 import logging
 from datetime import datetime
-
+from jinja2 import Template
 from pymongo.errors import PyMongoError
 
 version = "0.1"
@@ -159,35 +160,41 @@ def api_call(endpoint, payload=None, method="GET"):
 
 
 # Function to get all the asset models
-def get_snipe_models():
-    global MODELNUMBERS
-    payload = {
-        'limit': 500,
-        'offset': len(MODELNUMBERS)
+@lru_cache(maxsize=None)
+def get_snipe_models(page=0):
+    page_size = 500
+    limits = {
+        'limit': page_size,
+        'offset': page * page_size
     }
-    response = api_call("models", payload=payload, method="GET")
-    logging.info(f"Got a valid response that should have {response['total']} models.")
+    models = {}
+    response = api_call("models", payload=limits, method="GET")
 
-    if 'total' not in response or response['total'] == 0:
-        return False
+    # This happens if there is an error
+    if "total" not in response:
+        logging.error("Fetching models failed, enable debug to see response")
+        raise SystemExit("Necessary Snipe-IT API call failed")
 
-    for model in response['rows']:
-        if model['model_number'] == 0:
-            logging.debug(f"The model, {model['name']}, did not have a model number. Skipping.")
-            continue
-        MODELNUMBERS[model['model_number']] = int(model['id'])
+    # Quickly end if there are no rows
+    if "rows" not in response:
+        return models
 
-    if response['total'] > len(MODELNUMBERS):
-        logging.info(f"We have {len(MODELNUMBERS)}/{response['total']} models. Getting more.")
-        return get_snipe_models()
+    # Add the models to the dictionary
+    for row in response['rows']:
+        models[row['model_number']] = row['id']
 
-    return True
+    # If we haven't gotten all the models, get more
+    if response['total'] >= limits['offset']:
+        logging.debug(f"Fetching more models, currently at: {limits['offset']}/{response['total']}")
+        models.update(get_snipe_models(page + 1))
+
+    return models
 
 
-def get_snipe_model_id(model, manufacturer, device_type="computer", custom_fieldset_id=None):
-    global MODELNUMBERS
+def get_snipe_model_id(model, manufacturer, device_type="computer"):
+    global MODELNUMBERS, CONFIG
     if not MODELNUMBERS:
-        get_snipe_models()
+        MODELNUMBERS = get_snipe_models()
 
     if not clean_tag(model):
         logging.debug(f"Invalid model name {model} -> Unknown")
@@ -204,8 +211,10 @@ def get_snipe_model_id(model, manufacturer, device_type="computer", custom_field
         "name": model,
         "model_number": model
     }
-    if custom_fieldset_id:
-        new_model['fieldset_id'] = int(custom_fieldset_id)
+    if f'{device_type}_custom_fieldset_id' in CONFIG['snipe-it']:
+        custom_fieldset = CONFIG['snipe-it'][f'{device_type}_custom_fieldset_id']
+        new_model['fieldset_id'] = int(custom_fieldset)
+
     create_snipe_model(new_model)
 
     return MODELNUMBERS[model]
@@ -363,7 +372,7 @@ def get_manufacturer(name: str) -> int:
     response = api_call("manufacturers", payload=payload, method="POST")
 
     # If we do not have payload, but status 200, that means something went wrong
-    if not response['payload']:
+    if 'payload' not in response or not response['payload']:
         logging.error(f"Failed to create manufacturer {name}, response: {response}")
         raise SystemExit("Failed to create manufacturer")
 
@@ -380,13 +389,13 @@ def get_snipe_asset_by_name(name):
     }
     response = api_call("hardware", method="GET", payload=payload)
 
-    if 'total' not in response:
-        return None
+    if 'rows' not in response:
+        return {"total": 0}
 
     found = []
     # Search is fuzzy
     for row in response['rows']:
-        if row['name'] == name:
+        if html.unescape(row['name'].upper()) == name.upper():
             found.append(row)
 
     response['rows'] = found
@@ -394,33 +403,93 @@ def get_snipe_asset_by_name(name):
     return response
 
 
+def get_snipe_asset_by_mac(mac_address):
+    payload = {
+        'search': mac_address,
+        'limit': 50
+    }
+    response = api_call("hardware", method="GET", payload=payload)
+
+    if 'rows' not in response:
+        return {"total": 0}
+
+    found = []
+    # Search is fuzzy
+    for row in response['rows']:
+        for field_name in row['custom_fields']:
+            field = row['custom_fields'][field_name]
+            if 'mac_address' in field['field']:
+                if field['value'].upper() == mac_address.upper():
+                    found.append(row)
+                    break
+
+    if len(found) > 1:
+        logging.warning(f"Found multiple assets with MAC {mac_address}")
+        return SystemExit("Multiple assets found")
+
+    response['rows'] = found
+    response['total'] = len(found)
+    return response
+
+
 def get_os_config_value(os, config_key, data):
-    global CONFIG
-    try:
-        search_keys = CONFIG[f"{os}-api-mapping"][config_key].split(" ")
-    except KeyError:
-        logging.error(f"Key {config_key} not found in {os}-api-mapping")
-        return None
+    value = get_config_value(CONFIG[f"{os}-api-mapping"][config_key], data)
+    return clean_tag(value)
+
+
+# Function to recursively get keys from a dictionary
+def get_config_value(config_key, data, invalid_values=None):
+    logging.debug(f"Getting config value for {config_key}")
+    logging.debug(f"Data: {data}")
+    split_key = config_key.split("|", 1)
+    search_keys = split_key[0].strip().split(" ")
+    j2_str = None
+    if len(split_key) > 1:
+        j2_str = split_key[1].strip()
+        logging.debug(f"Jinja2 template: {j2_str}")
 
     value = data
     for key in search_keys:
         try:
+            # Try to convert to int, settings file returns strings,
+            # but if we want to traverse a list we need an int
             key = int(key)
         except ValueError:
             logging.debug(f"{key} is not an integer")
         try:
             value = value[key]
-        except (KeyError, IndexError):
-            logging.info(f"{key} does not exist")
-            logging.debug(f"Ansible value: {value}")
+        except (KeyError, IndexError, TypeError):
+            # JAMF is not consistent with return types
+            logging.info(f"{key} does not exist or is empty")
+            logging.debug(f"Key value: {value}")
             value = None
             break
-        except TypeError:
-            logging.error(f"Type error when fetching data for {key}, check your config")
-            raise SystemExit
+
+    if invalid_values and value in invalid_values:
+        value = None
+
+    if j2_str:
+        template = Template(j2_str)
+        value = template.render(var=value, data=data)
 
     logging.debug(f"Got value {value} for {config_key}")
-    return clean_tag(value)
+    return value
+
+
+def clean_mac(mac_address: str) -> str | None:
+    if mac_address.startswith('0A:00:27'):
+        return None
+    return mac_address
+
+
+def clean_os(operating_system: str) -> str:
+    if operating_system == 'Red Hat':
+        return "RedHat"
+    if "Monterey" in operating_system:
+        return "macOS"
+    if operating_system.startswith("Mac OS 10"):
+        return "Mac OS X"
+    return operating_system
 
 
 def clean_tag(value: Any) -> str | None:
@@ -436,7 +505,6 @@ def clean_tag(value: Any) -> str | None:
                "asset tag",
                "not specified",
                "system manufacturer",
-               "\x07ell inc.",
                "0",
                "system product name",
                "null",
@@ -453,11 +521,165 @@ def clean_tag(value: Any) -> str | None:
                "..................",
                "empty"]
 
-    if not value or str(value).lower() in invalid:
+    if not value or len(str(value)) < 3 or str(value).lower() in invalid:
         return None
 
     logging.debug(f"Clean tag: {value}")
     return str(value)
+
+
+def clean_manufacturer(manufacturer):
+    if not manufacturer:
+        logging.info(f"Manufacturer not available. Setting to Unknown.")
+        return 'Unknown'
+
+    manufacturer_lower = manufacturer.lower()
+    if manufacturer_lower.startswith('apple'):
+        return 'Apple'
+    elif manufacturer_lower.startswith('dell') or manufacturer_lower.endswith('ell inc.'):
+        return 'Dell Inc.'
+    elif manufacturer_lower.startswith('aaeon'):
+        return 'AAEON Technology Inc.'
+    elif manufacturer_lower.startswith('asix'):
+        return 'ASIX Electronics Corporation'
+    elif manufacturer_lower.startswith('advansus'):
+        return 'Advansus Corp.'
+    elif manufacturer_lower.startswith('advantech'):
+        return 'Advantech Co., Ltd.'
+    elif manufacturer_lower.startswith('andover'):
+        return 'Andover Controls Corporation'
+    elif manufacturer_lower.startswith('armorlin'):
+        return 'Armorlink Co., Ltd.'
+    elif manufacturer_lower.startswith('asrock'):
+        return 'ASRock Incorporation'
+    elif manufacturer_lower.startswith('axiom'):
+        return 'Axiom Technology Co., Ltd.'
+    elif manufacturer_lower.startswith('asus'):
+        return 'ASUSTeK Computer Inc.'
+    elif manufacturer_lower.startswith('azurewav'):
+        return 'AzureWave Technologies, Inc.'
+    elif manufacturer_lower.startswith('belkin'):
+        return 'Belkin International Inc.'
+    elif manufacturer_lower.startswith('bizlink'):
+        return 'BizLink (Kunshan) Co.,Ltd'
+    elif manufacturer_lower.startswith('brady'):
+        return 'Brady Corporation'
+    elif manufacturer_lower.startswith('broadcom'):
+        return 'Broadcom Inc.'
+    elif manufacturer_lower.startswith('ce') and 'link' in manufacturer_lower:
+        return 'Ce Link Limited'
+    elif manufacturer_lower.startswith('chongqin'):
+        return 'Chongqing Fugui Electronics Co.,Ltd.'
+    elif manufacturer_lower.startswith('cisco'):
+        return 'Cisco Systems, Inc.'
+    elif manufacturer_lower.startswith('cloud') and 'net' in manufacturer_lower:
+        return 'Cloud Network Technology (Samoa) Limited'
+    elif manufacturer_lower.startswith('cyberpow'):
+        return 'Cyber Power Systems, Inc.'
+    elif manufacturer_lower.startswith('cybernet'):
+        return 'Cybernet Manufacturing Inc.'
+    elif manufacturer_lower.startswith('dfi'):
+        return 'DFI Inc.'
+    elif manufacturer_lower.startswith('flytech'):
+        return 'Flytech Technology Co., Ltd.'
+    elif manufacturer_lower.startswith('fujitsu'):
+        return 'Fujitsu'
+    elif manufacturer_lower.startswith('gigabyte') or manufacturer_lower.startswith('giga-byte'):
+        return 'Gigabyte Technology Co., Ltd.'
+    elif manufacturer_lower.startswith('gigamon'):
+        return 'Gigamon Systems LLC'
+    elif manufacturer_lower.startswith('good') and 'way' in manufacturer_lower:
+        return 'Good Way Technology Co., Ltd.'
+    # Do HPE before HP
+    elif (manufacturer_lower.startswith('hpe') or
+          ('hewlett' in manufacturer_lower and 'enterprise' in manufacturer_lower)):
+        return "Hewlett Packard Enterprise"
+    elif manufacturer_lower.startswith('hp') or manufacturer_lower.startswith('hewlett'):
+        return 'Hewlett-Packard'
+    elif manufacturer_lower.startswith('hitachi'):
+        return 'Hitachi'
+    elif manufacturer_lower.startswith('huizhou') and 'd' in manufacturer_lower:
+        return 'Huizhou Dehong Technology Co., Ltd.'
+    elif manufacturer_lower.startswith('hon') and 'hai' in manufacturer_lower:
+        return 'Hon Hai Precision Ind. Co.,Ltd.'
+    elif manufacturer_lower.startswith('intel'):
+        return 'Intel Corporation'
+    elif manufacturer_lower.startswith('ibm'):
+        return 'IBM'
+    elif manufacturer_lower.startswith('juniper'):
+        return 'Juniper'
+    elif manufacturer_lower.startswith('jump') and 'indu' in manufacturer_lower:
+        return 'JUMPtec Industrielle Computertechnik AG'
+    elif manufacturer_lower.startswith('jetway') and 'in' in manufacturer_lower:
+        return 'Jetway Information Co., Ltd.'
+    elif manufacturer_lower.startswith('kcodes'):
+        return 'KCodes Corporation'
+    elif manufacturer_lower.startswith('lcfc'):
+        return 'LCFC(HeFei) Electronics Technology Co., Ltd.'
+    elif manufacturer_lower.startswith('lenovo'):
+        return 'Lenovo'
+    elif manufacturer_lower.startswith('luxshare'):
+        return 'Luxshare Precision Industry Co., Ltd.'
+    elif manufacturer_lower.startswith('liteon'):
+        return 'Liteon Technology Corporation'
+    elif manufacturer_lower.startswith('lg'):
+        return 'LG Electronics'
+    elif manufacturer_lower.startswith('micro-star'):
+        return 'Micro-Star International Co., Ltd.'
+    elif manufacturer_lower.startswith('microsof'):
+        return 'Microsoft Corporation'
+    elif manufacturer_lower.startswith('mitac'):
+        return 'Mitac International Corp.'
+    elif manufacturer_lower.startswith('nec'):
+        return 'NEC Corporation'
+    elif manufacturer_lower.startswith('oracle'):
+        return 'Oracle Corporation'
+    elif manufacturer_lower.startswith('parallels'):
+        return 'Parallels Software International Inc.'
+    elif manufacturer_lower.startswith('pc') and 'partne' in manufacturer_lower:
+        return 'PC Partner Ltd.'
+    elif manufacturer_lower.startswith('palo alto'):
+        return 'Palo Alto Networks'
+    elif manufacturer_lower.startswith('panasonic'):
+        return 'Panasonic'
+    elif manufacturer_lower.startswith('pioneer'):
+        return 'Pioneer'
+    elif manufacturer_lower.startswith('realtek'):
+        return 'Realtek Semiconductor Corp.'
+    elif 'schneider electric' in manufacturer_lower:
+        return 'Schneider Electric'
+    elif manufacturer_lower.startswith('siemens'):
+        return 'Siemens AG'
+    elif manufacturer_lower.startswith('summit'):
+        return 'Summit Data Communications'
+    elif manufacturer_lower.startswith('sony'):
+        return 'Sony Corporation'
+    elif manufacturer_lower.startswith('super') and 'micro' in manufacturer_lower:
+        return 'Super Micro Computer, Inc.'
+    elif manufacturer_lower.startswith('tangent'):
+        return 'Tangent, Inc.'
+    elif manufacturer_lower.startswith('toshiba'):
+        return 'Toshiba Corporation'
+    elif manufacturer_lower.startswith('texas') and 'ins' in manufacturer_lower:
+        return 'Texas Instruments'
+    elif manufacturer_lower.startswith('tyan'):
+        return 'Tyan Computer Corp.'
+    elif manufacturer_lower.startswith('vmware'):
+        return 'VMware, Inc.'
+    elif manufacturer_lower.startswith('variscit'):
+        return 'Variscite LTD'
+    elif manufacturer_lower.startswith('wistron'):
+        return 'Wistron Corporation'
+    elif manufacturer_lower.startswith('zebra'):
+        return 'Zebra Technologies Inc.'
+    elif manufacturer_lower.startswith('congatec'):
+        return 'congatec AG'
+    elif manufacturer_lower.startswith('3s') and ('system' in manufacturer_lower or 'vision' in manufacturer_lower):
+        return '3S System Tech Inc.'
+    elif manufacturer_lower.startswith('speed') and 'dra' in manufacturer_lower:
+        return 'Speed Dragon Multimedia Limited'
+
+    return manufacturer
 
 
 def extract_api_mapping(os: str, asset_data: Iterable) -> dict:
@@ -485,7 +707,7 @@ runtime_args.add_argument("--auto_incrementing",
                           help="If you have auto-incrementing enabled in your snipe instance, utilize that",
                           action="store_true")
 runtime_args.add_argument("--dryrun",
-                          help="This checks your config but exits before making any changes to Snipe-IT.",
+                          help="This checks your CONFIG but exits before making any changes to Snipe-IT.",
                           action="store_true")
 runtime_args.add_argument("-d", "--debug", help="Sets logging to include additional DEBUG messages.",
                           action="store_true")
@@ -531,13 +753,13 @@ CONFIG = RawConfigParser()
 logging.debug("Checking for a settings.conf in /opt/jamf2snipe ...")
 CONFIG.read("/opt/ansible2snipe/settings.conf")
 if 'snipe-it' not in set(CONFIG):
-    logging.debug("No valid config found in: /opt Checking for a settings.conf in /etc/jamf2snipe ...")
+    logging.debug("No valid CONFIG found in: /opt Checking for a settings.conf in /etc/jamf2snipe ...")
     CONFIG.read('/etc/jamf2snipe/settings.conf')
 if 'snipe-it' not in set(CONFIG):
-    logging.debug("No valid config found in /etc Checking for a settings.conf in current directory ...")
+    logging.debug("No valid CONFIG found in /etc Checking for a settings.conf in current directory ...")
     CONFIG.read("settings.conf")
 if 'snipe-it' not in set(CONFIG):
-    logging.debug("No valid config found in current folder.")
+    logging.debug("No valid CONFIG found in current folder.")
     logging.error(
         "No valid settings.conf was found. We'll need to quit while you figure out where the settings are at. "
         "You can check the README for valid locations.")
@@ -561,7 +783,7 @@ except KeyError:
         "Re-run ansible2snipe with the --verbose or --debug flag to get more details.")
     raise SystemExit("Error: Missing or invalid settings in settings.conf - Exiting.")
 
-# Check the config file for correct headers
+# Check the CONFIG file for correct headers
 
 # Do some tests to see if the admin has updated their settings.conf file
 settings_correct = True
@@ -586,7 +808,7 @@ def main():
     response = api_call("ping", method="GET")
     if not response.text:
         logging.error('Snipe-IT looks like it is down from here. \n'
-                      'Please check your config in the settings.conf file, or your instance.')
+                      'Please check your CONFIG in the settings.conf file, or your instance.')
         raise SystemExit("Error: Host could not be contacted.")
 
     logging.info('We were able to get a good response from your Snipe-IT instance.')
@@ -623,11 +845,6 @@ def main():
             logging.error(f"Missing key(s) in {os}-api-mapping section. Please check your settings.conf file")
             raise SystemExit("Error: Missing or invalid settings in settings.conf - Exiting.")
 
-        # Get the device _custom_fieldset_id if exists
-        custom_fieldset = None
-        if f'{device_type}_custom_fieldset_id' in CONFIG['snipe-it']:
-            custom_fieldset = CONFIG['snipe-it'][f'{device_type}_custom_fieldset_id']
-
         for ansible_asset in get_ansible_computers(os):
             if not ansible_asset:
                 continue
@@ -638,7 +855,7 @@ def main():
             serial = get_os_config_value(os, 'serial', ansible_asset['data'])
             asset_tag = get_os_config_value(os, 'asset_tag', ansible_asset['data'])
             model = get_os_config_value(os, 'model', ansible_asset['data'])
-            manufacturer = get_os_config_value(os, 'manufacturer', ansible_asset['data'])
+            manufacturer = clean_manufacturer(get_os_config_value(os, 'manufacturer', ansible_asset['data']))
 
             snipe_asset = get_snipe_asset(serial)
             if snipe_asset['total'] == 0:
@@ -658,17 +875,13 @@ def main():
                 logging.warning(f"Multiple assets found for {serial}. Skipping.")
                 continue
 
-            if not manufacturer:
-                logging.info(f"Manufacturer not available for {ansible_asset['_id']}. Setting to Unknown.")
-                manufacturer = "Unknown"
-
             if not model:
                 logging.info(f"Model not available for {ansible_asset['_id']}. Setting to Unknown.")
                 model = "Unknown"
                 # Manufacturer is a dependency of model, so if model is unknown, manufacturer is unknown
                 manufacturer = "Unknown"
 
-            model_id = get_snipe_model_id(model, manufacturer, device_type, custom_fieldset)
+            model_id = get_snipe_model_id(model, manufacturer, device_type)
 
             # Create a payload:
             payload = {

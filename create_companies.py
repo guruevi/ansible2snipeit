@@ -9,7 +9,7 @@ apikey = CONFIG['snipe-it']['apikey']
 
 headers = {
     "accept": "application/json",
-    "content-type": "application/json",
+    "content-device_type": "application/json",
     "authorization": f"Bearer {apikey}"
 }
 
