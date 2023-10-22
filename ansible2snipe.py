@@ -161,7 +161,7 @@ def get_snipe_asset(serial="", name="", mac_address="", asset_tag=""):
         if 'rows' in response:
             for row in response['rows']:
                 for field_name, field in row['custom_fields'].items():
-                    if field['field_type'] == 'MAC' and field['value'].upper() == mac_address.upper():
+                    if field['field_format'] == 'MAC' and field['value'].upper() == mac_address.upper():
                         found.append(row)
                         break
 
