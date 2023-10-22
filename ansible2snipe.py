@@ -120,11 +120,6 @@ def get_snipe_asset(serial="", name="", mac_address="", asset_tag=""):
     api_url = ""
     if serial:
         api_url = f'hardware/byserial/{serial}'
-
-    if asset_tag:
-        api_url = f'hardware/bytag/{asset_tag}'
-
-    if api_url:
         response = api_call(api_url)
         if 'total' in response:
             if response['total'] == 1:
@@ -133,34 +128,45 @@ def get_snipe_asset(serial="", name="", mac_address="", asset_tag=""):
                 logging.error(f"Multiple assets found for {serial}/{asset_tag}/{name}/{mac_address}")
                 raise SystemExit("Multiple assets found")
 
-    if name or mac_address:
+    if asset_tag:
+        api_url = f'hardware/bytag/{asset_tag}'
+        response = api_call(api_url)
+        if 'total' in response:
+            if response['total'] == 1:
+                return response
+            if response['total'] > 1:
+                logging.error(f"Multiple assets found for {serial}/{asset_tag}/{name}/{mac_address}")
+                raise SystemExit("Multiple assets found")
+
+    found = []
+    if name:
         payload = {
             'search': name,
             'limit': 500
         }
         response = api_call("hardware", method="GET", payload=payload)
-        if 'total' not in response or not response['total']:
-            response['total'] = 0
-            return response
 
-        found = []
-        # Search is fuzzy
-        if name:
+        if 'rows' in response:
+            # Search is fuzzy
             for row in response['rows']:
                 if html.unescape(row['name'].upper()) == name.upper():
                     found.append(row)
 
-        if mac_address:
+    if mac_address and len(found) == 0:
+        payload = {
+            'search': mac_address,
+            'limit': 500
+        }
+        response = api_call("hardware", method="GET", payload=payload)
+        if 'rows' in response:
             for row in response['rows']:
-                for field_name in row['custom_fields']:
-                    field = row['custom_fields'][field_name]
-                    if 'mac_address' in field['field']:
-                        if field['value'].upper() == mac_address.upper():
-                            found.append(row)
-                            break
+                for field_name, field in row['custom_fields'].items():
+                    if field['field_type'] == 'MAC' and field['value'].upper() == mac_address.upper():
+                        found.append(row)
+                        break
 
-        response['rows'] = found
-        response['total'] = len(found)
+    response['rows'] = found
+    response['total'] = len(found)
 
     return response
 
