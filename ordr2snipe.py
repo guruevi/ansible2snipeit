@@ -139,7 +139,7 @@ while next_page:
         # Create a payload:
         if not serial:
             print(f"WARNING: Serial number not found for {name}.")
-            serial = f"ordr-{macaddress.replace(':', '')}"
+            serial = asset_tag.replace("_", "")
 
         payload = {
             "name": name,
