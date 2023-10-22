@@ -126,13 +126,18 @@ def get_snipe_asset(serial="", name="", mac_address="", asset_tag=""):
     if serial:
         api_url = f'hardware/byserial/{serial}'
         response = api_call(api_url)
+        if 'total' in response:
+            if response['total'] == 1:
+                return response
+            elif response['total'] > 1:
+                logging.error(f"Got multiple responses for a serial number")
+                raise SystemExit("Multiple responses for a serial number")
 
     if asset_tag:
         api_url = f'hardware/bytag/{asset_tag}'
         response = api_call(api_url)
-
-    if 'id' in response:
-        return {'rows': [response], 'total': 1}
+        if 'id' in response:
+            return {'rows': [response], 'total': 1}
 
     found = []
     if name and len(name) > 3:
