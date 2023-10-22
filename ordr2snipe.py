@@ -186,10 +186,7 @@ while next_page:
             logging.info(f"Existing asset in Snipe-IT for {name}")
             asset = snipe_asset['rows'][0]
 
-            if (asset['serial'] and payload['serial'] != asset['serial'] and
-                    (not asset['serial'].startswith('ans-') or
-                     not asset['serial'].startswith('ordr-') or
-                     not asset['serial'].startswith('sccm-'))):
+            if payload['serial'] == asset['serial'] or payload['serial'].startswith('ordr-'):
                 del payload['serial']
 
             # ORDR is less accurate on these things
@@ -212,7 +209,7 @@ while next_page:
                     del payload[value['field']]
 
             if macaddress and macaddress not in snipe_macaddress:
-                payload[snipe_macaddress_field[len(snipe_macaddress)]] = macaddress
+                payload[snipe_macaddress_field[len(snipe_macaddress) + 1]] = macaddress
 
             for key in asset:
                 if key in payload and html.unescape(str(asset[key])) == str(payload[key]):
