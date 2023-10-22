@@ -115,13 +115,52 @@ def search_ansible_name(name):
 
 
 # Function to look up a snipe asset by serial number.
-def get_snipe_asset(serial):
-    if not serial:
-        return {"total": 0}
-    api_url = f'hardware/byserial/{serial}'
-    response = api_call(api_url)
-    if 'total' not in response:
-        response['total'] = 0
+def get_snipe_asset(serial="", name="", mac_address="", asset_tag=""):
+    response = {'total': 0}
+    api_url = ""
+    if serial:
+        api_url = f'hardware/byserial/{serial}'
+
+    if asset_tag:
+        api_url = f'hardware/bytag/{asset_tag}'
+
+    if api_url:
+        response = api_call(api_url)
+        if 'total' in response:
+            if response['total'] == 1:
+                return response
+            if response['total'] > 1:
+                logging.error(f"Multiple assets found for {serial}/{asset_tag}/{name}/{mac_address}")
+                raise SystemExit("Multiple assets found")
+
+    if name or mac_address:
+        payload = {
+            'search': name,
+            'limit': 500
+        }
+        response = api_call("hardware", method="GET", payload=payload)
+        if 'total' not in response or not response['total']:
+            response['total'] = 0
+            return response
+
+        found = []
+        # Search is fuzzy
+        if name:
+            for row in response['rows']:
+                if html.unescape(row['name'].upper()) == name.upper():
+                    found.append(row)
+
+        if mac_address:
+            for row in response['rows']:
+                for field_name in row['custom_fields']:
+                    field = row['custom_fields'][field_name]
+                    if 'mac_address' in field['field']:
+                        if field['value'].upper() == mac_address.upper():
+                            found.append(row)
+                            break
+
+        response['rows'] = found
+        response['total'] = len(found)
 
     return response
 
@@ -129,12 +168,9 @@ def get_snipe_asset(serial):
 def api_call(endpoint, payload=None, method="GET"):
     global CONFIG, USER_ARGS
     # Headers for the API call.
-    logging.info("Creating the headers we'll need for API calls")
     snipe_headers = {'Authorization': f"Bearer {CONFIG['snipe-it']['apikey']}",
                      'Accept': 'application/json',
                      'Content-Type': 'application/json'}
-    logging.debug(f'Request headers for Snipe will be: {snipe_headers}')
-
     logging.debug(f"Calling {endpoint} with method {method} and payload {payload}")
     api_url = f"{CONFIG['snipe-it']['url']}/api/v1/{endpoint}"
     if method == "GET":
@@ -381,56 +417,6 @@ def get_manufacturer(name: str) -> int:
     MANUFACTURERS[response['payload']['name']] = int(response['payload']['id'])
 
     return MANUFACTURERS[name]
-
-
-def get_snipe_asset_by_name(name):
-    payload = {
-        'search': name,
-        'limit': 50
-    }
-    response = api_call("hardware", method="GET", payload=payload)
-
-    if 'rows' not in response:
-        return {"total": 0}
-
-    found = []
-    # Search is fuzzy
-    for row in response['rows']:
-        if html.unescape(row['name'].upper()) == name.upper():
-            found.append(row)
-
-    response['rows'] = found
-    response['total'] = len(found)
-    return response
-
-
-def get_snipe_asset_by_mac(mac_address):
-    payload = {
-        'search': mac_address,
-        'limit': 50
-    }
-    response = api_call("hardware", method="GET", payload=payload)
-
-    if 'rows' not in response:
-        return {"total": 0}
-
-    found = []
-    # Search is fuzzy
-    for row in response['rows']:
-        for field_name in row['custom_fields']:
-            field = row['custom_fields'][field_name]
-            if 'mac_address' in field['field']:
-                if field['value'].upper() == mac_address.upper():
-                    found.append(row)
-                    break
-
-    if len(found) > 1:
-        logging.warning(f"Found multiple assets with MAC {mac_address}")
-        return SystemExit("Multiple assets found")
-
-    response['rows'] = found
-    response['total'] = len(found)
-    return response
 
 
 def get_os_config_value(os, config_key, data):
@@ -859,11 +845,6 @@ def main():
             model = get_os_config_value(os, 'model', ansible_asset['data'])
             manufacturer = clean_manufacturer(get_os_config_value(os, 'manufacturer', ansible_asset['data']))
 
-            snipe_asset = get_snipe_asset(serial)
-            if snipe_asset['total'] == 0:
-                logging.info(f"Serial number {serial} not found in snipe. Checking for asset name.")
-                snipe_asset = get_snipe_asset_by_name(computer_name)
-
             if not serial:
                 logging.debug(f"Serial number not found for {ansible_asset['_id']}. Skipping.")
                 serial = f"ans-{ansible_asset['_id']}"
@@ -872,9 +853,11 @@ def main():
                 logging.debug(f"Asset tag not found for {ansible_asset['_id']}. Skipping.")
                 asset_tag = f"ans-{ansible_asset['_id']}"
 
+            snipe_asset = get_snipe_asset(serial=serial, computer_name=computer_name, asset_tag=asset_tag)
+
             logging.debug(f"Snipe returned: {snipe_asset}")
             if snipe_asset['total'] > 1:
-                logging.warning(f"Multiple assets found for {serial}. Skipping.")
+                logging.warning(f"Multiple assets found for {computer_name}. Skipping.")
                 continue
 
             if not model:

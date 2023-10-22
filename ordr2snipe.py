@@ -7,9 +7,8 @@ import html
 from requests import get
 from requests.auth import HTTPBasicAuth
 import logging
-from ansible2snipe import CONFIG, clean_manufacturer, clean_tag, get_snipe_model_id, \
-    get_snipe_asset_by_mac, get_snipe_asset, get_snipe_asset_by_name, update_snipe_asset, \
-    create_snipe_asset, clean_mac, clean_os
+from ansible2snipe import (CONFIG, clean_manufacturer, clean_tag, get_snipe_model_id, get_snipe_asset,
+                           update_snipe_asset, create_snipe_asset, clean_mac, clean_os)
 
 # Get the ORDR API key from CONFIG
 ordr_username = CONFIG.get('ordr', 'username')
@@ -109,16 +108,7 @@ while next_page:
             print(f"WARNING: Category {device['Group']} not found. Skipping.")
             continue
 
-        snipe_asset = get_snipe_asset(serial)
-
-        if not snipe_asset or not snipe_asset['total'] or snipe_asset['total'] > 1:
-            logging.debug(f"Serial number not found for {name}.")
-
-            snipe_asset = get_snipe_asset_by_name(name)
-
-            if macaddress and (not snipe_asset or not snipe_asset['total'] or snipe_asset['total'] > 1):
-                logging.info(f"Asset name {name} not found in snipe. Checking for MAC address.")
-                snipe_asset = get_snipe_asset_by_mac(macaddress)
+        snipe_asset = get_snipe_asset(serial=serial, mac_address=macaddress, name=name, asset_tag=asset_tag)
 
         if snipe_asset['total'] > 1:
             logging.error(f"Multiple assets in Snipe-IT for {name}")

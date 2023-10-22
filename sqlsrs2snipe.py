@@ -8,8 +8,7 @@ import xml.etree.ElementTree as ET
 import requests
 from requests_ntlm import HttpNtlmAuth
 from ansible2snipe import (get_snipe_model_id, get_snipe_asset, clean_tag, create_snipe_asset, update_snipe_asset,
-                           checkout_snipe_asset, USER_ARGS, get_snipe_asset_by_name, CONFIG, clean_mac,
-                           get_snipe_asset_by_mac, clean_manufacturer)
+                           checkout_snipe_asset, USER_ARGS, CONFIG, clean_mac, clean_manufacturer)
 
 # Stat file
 try:
@@ -171,15 +170,11 @@ for entry in tree.findall('atom:entry', namespaces):
     # Get MAC address from report2 which is a different report
     details = tree2.find(f".//ns1:Detail[@Details_Table0_ComputerName='{computer_name}']", namespaces=namespaces)
 
+    macaddress = ""
     if details is not None:
         macaddress = clean_mac(details.attrib['MAC_Address'])
 
-    snipe_asset = get_snipe_asset(serial_number)
-    if snipe_asset['total'] == 0:
-        logging.info(f"Serial number {serial_number} not found in snipe. Checking for asset name.")
-        snipe_asset = get_snipe_asset_by_name(computer_name)
-        if snipe_asset['total'] == 0 and macaddress:
-            snipe_asset = get_snipe_asset_by_mac(macaddress)
+    snipe_asset = get_snipe_asset(serial=serial_number, mac_address=macaddress, name=computer_name, asset_tag=asset_tag)
 
     if snipe_asset['total'] > 1:
         logging.error(f"Multiple assets found for {serial_number}")
