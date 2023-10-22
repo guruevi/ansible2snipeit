@@ -119,7 +119,12 @@ while next_page:
             print(f"WARNING: Category {device['Group']} not found. Skipping.")
             continue
 
-        snipe_asset = get_snipe_asset(serial=serial, mac_address=macaddress, name=name)
+        if macaddress:
+            asset_tag = "ordr-" + macaddress.replace(':', '_')
+        else:
+            asset_tag = "ordr-" + name
+
+        snipe_asset = get_snipe_asset(serial=serial, mac_address=macaddress, name=name, asset_tag=asset_tag)
 
         if snipe_asset['total'] > 1:
             logging.error(f"Multiple assets in Snipe-IT for {name}")
@@ -131,11 +136,6 @@ while next_page:
         if not serial:
             print(f"WARNING: Serial number not found for {name}.")
             serial = f"ordr-{macaddress.replace(':', '')}"
-
-        if macaddress:
-            asset_tag = "ordr-" + macaddress.replace(':', '_')
-        else:
-            asset_tag = "ordr-" + name
 
         payload = {
             "name": name,
