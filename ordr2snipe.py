@@ -7,8 +7,8 @@ import html
 from requests import get
 from requests.auth import HTTPBasicAuth
 import logging
-from ansible2snipe import CONFIG, clean_manufacturer, clean_tag, get_manufacturer, get_snipe_model_id, \
-    get_snipe_asset_by_mac, get_snipe_asset, get_snipe_asset_by_name, extract_api_mapping, update_snipe_asset, \
+from ansible2snipe import CONFIG, clean_manufacturer, clean_tag, get_snipe_model_id, \
+    get_snipe_asset_by_mac, get_snipe_asset, get_snipe_asset_by_name, update_snipe_asset, \
     create_snipe_asset, clean_mac, clean_os
 
 # Get the ORDR API key from CONFIG

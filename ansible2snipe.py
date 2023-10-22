@@ -182,6 +182,7 @@ def get_snipe_models(page=0):
     # Add the models to the dictionary
     for row in response['rows']:
         models[row['model_number']] = row['id']
+        models[row['name']] = row['id']
 
     # If we haven't gotten all the models, get more
     if response['total'] >= limits['offset']:
@@ -497,6 +498,7 @@ def clean_tag(value: Any) -> str | None:
                "not available",
                "to be filled by o.e.m.",
                "to be filled by o.e.m",
+               "to be filled by oem",
                "system serial number",
                "0123456789",
                "1234567890",
