@@ -152,7 +152,7 @@ def get_snipe_asset(serial="", name="", mac_address="", asset_tag=""):
                 if html.unescape(row['name'].upper()) == name.upper():
                     found.append(row)
 
-    if mac_address and len(found) == 0:
+    if mac_address and len(found) == 0 and name != mac_address and serial != mac_address and asset_tag != mac_address:
         payload = {
             'search': mac_address,
             'limit': 500
