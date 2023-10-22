@@ -135,7 +135,7 @@ def get_snipe_asset(serial="", name="", mac_address="", asset_tag=""):
         return {'rows': [response], 'total': 1}
 
     found = []
-    if name:
+    if name and len(name) > 3:
         payload = {
             'search': name,
             'limit': 500
