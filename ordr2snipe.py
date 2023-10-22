@@ -190,7 +190,9 @@ while next_page:
             logging.info(f"Existing asset in Snipe-IT for {name}")
             asset = snipe_asset['rows'][0]
 
-            if payload['serial'] == asset['serial'] or payload['serial'].startswith('ordr-'):
+            if (payload['serial'] == asset['serial'] or
+                    payload['serial'].startswith('ordr-') or
+                    not asset['serial'].startswith('ordr-')):
                 del payload['serial']
 
             # ORDR is less accurate on these things
