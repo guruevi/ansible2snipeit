@@ -118,6 +118,11 @@ def search_ansible_name(name):
 def get_snipe_asset(serial="", name="", mac_address="", asset_tag=""):
     response = {'total': 0}
     api_url = ""
+    serial = clean_tag(serial)
+    name = clean_tag(name)
+    mac_address = clean_mac(mac_address)
+    asset_tag = clean_tag(asset_tag)
+
     if serial:
         api_url = f'hardware/byserial/{serial}'
         response = api_call(api_url)
@@ -127,6 +132,8 @@ def get_snipe_asset(serial="", name="", mac_address="", asset_tag=""):
             if response['total'] > 1:
                 logging.error(f"Multiple assets found for {serial}/{asset_tag}/{name}/{mac_address}")
                 raise SystemExit("Multiple assets found")
+        response['total'] = 0
+        return response
 
     if asset_tag:
         api_url = f'hardware/bytag/{asset_tag}'

@@ -47,11 +47,6 @@ while next_page:
         name = device['deviceName'].split('.')[0].upper()
         macaddress = clean_mac(device['MacAddress'])
 
-        if macaddress:
-            asset_tag = "ordr-" + macaddress.replace(':', '_')
-        else:
-            asset_tag = "ordr-" + name
-
         if 'MfgName' in device:
             manufacturer = clean_manufacturer(clean_tag(device['MfgName']))
         else:
@@ -69,10 +64,6 @@ while next_page:
             serial = clean_tag(device['SerialNo'])
         else:
             serial = None
-
-        if not serial:
-            print(f"WARNING: Serial number not found for {name}.")
-            serial = f"ordr-{macaddress.replace(':', '')}"
 
         if device['Group'] == "Workstations" or device['Group'] == "Servers":
             device_type = "computer"
@@ -108,7 +99,7 @@ while next_page:
             print(f"WARNING: Category {device['Group']} not found. Skipping.")
             continue
 
-        snipe_asset = get_snipe_asset(serial=serial, mac_address=macaddress, name=name, asset_tag=asset_tag)
+        snipe_asset = get_snipe_asset(serial=serial, mac_address=macaddress, name=name)
 
         if snipe_asset['total'] > 1:
             logging.error(f"Multiple assets in Snipe-IT for {name}")
@@ -117,6 +108,15 @@ while next_page:
 
         model_id = get_snipe_model_id(model, manufacturer, device_type)
         # Create a payload:
+        if not serial:
+            print(f"WARNING: Serial number not found for {name}.")
+            serial = f"ordr-{macaddress.replace(':', '')}"
+
+        if macaddress:
+            asset_tag = "ordr-" + macaddress.replace(':', '_')
+        else:
+            asset_tag = "ordr-" + name
+
         payload = {
             "name": name,
             "serial": serial,
