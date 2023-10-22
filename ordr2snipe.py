@@ -64,7 +64,11 @@ while next_page:
         logging.info(f"Processing {device['deviceName']}")
         logging.debug(device)
 
-        name = device['deviceName'].split('.')[0].upper()
+        # DHCP hostname is reported by the device, deviceName is reported by the DNS server
+        if 'dhcpHostname' in device:
+            name = device['dhcpHostname'].split('.')[0].upper()
+        else:
+            name = device['deviceName'].split('.')[0].upper()
         macaddress = clean_mac(device['MacAddress'])
 
         if 'MfgName' in device:
@@ -177,7 +181,7 @@ while next_page:
             payload['_snipeit_os_version_9'] = os_version
 
         asset = {}
-        if not snipe_asset['total']:
+        if snipe_asset['total'] == 0:
             logging.info(f"Creating a new asset in snipe for {name}")
             logging.debug(payload)
             asset = create_snipe_asset(payload)
