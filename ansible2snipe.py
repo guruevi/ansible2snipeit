@@ -471,7 +471,7 @@ def get_config_value(config_key, data, invalid_values=None):
 
 
 def clean_mac(mac_address: str) -> str | None:
-    if mac_address.startswith('0A:00:27'):
+    if not mac_address or mac_address.startswith('0A:00:27'):
         return None
     return mac_address
 
