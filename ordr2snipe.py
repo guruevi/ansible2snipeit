@@ -3,6 +3,7 @@
 # This will get a list of systems from ORDR and put them into Snipe-IT as "need-to-audit" assets.
 
 import html
+import os
 
 from requests import get
 from requests.auth import HTTPBasicAuth
@@ -26,9 +27,22 @@ try:
 except FileNotFoundError:
     next_page = "/Rest/Devices"
 
+# Get environment variables
+valid_params = ["os-type", "connStatus", "filter-by-ext-data", "type", "mac", "iot", "weakPassword", "attribute-filter",
+                "include-ext-data", "limit", "model", "startTime", "vulnIds", "endpointToken", "include-ext-data-ref",
+                "riskState", "group", "include", "sensorName", "appName", "ip", "profile", "tenantGuid", "version",
+                "userId", "biosPassword", "mfg", "filter", "mfg-long", "os-version", "patchInstalled", "serial",
+                "has-flow-vectors", "policy-profile", "sw-version", "location", "diskEncrypted", "endTime", "sensorIp",
+                "clientMacToken", "subcategory", "softwareInstalled", "openPorts"]
+parameter = os.getenv('ORDR_PARAM', None)
+value = os.getenv('ORDR_VALUE', None)
+
+if parameter in valid_params:
+    query_param = f"?{parameter}={value}"
+
 while next_page:
     # Get the first page of results
-    response = get(ordr_url + next_page, auth=auth, verify=ordr_tls_verify)
+    response = get(ordr_url + next_page + query_param, auth=auth, verify=ordr_tls_verify)
     data = response.json()
 
     if 'next' in data['MetaData'] and data['MetaData']['next']:

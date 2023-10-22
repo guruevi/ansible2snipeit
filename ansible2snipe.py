@@ -858,6 +858,8 @@ def main():
             model = get_os_config_value(os, 'model', ansible_asset['data'])
             manufacturer = clean_manufacturer(get_os_config_value(os, 'manufacturer', ansible_asset['data']))
 
+            snipe_asset = get_snipe_asset(serial=serial, computer_name=computer_name, asset_tag=asset_tag)
+
             if not serial:
                 logging.debug(f"Serial number not found for {ansible_asset['_id']}. Skipping.")
                 serial = f"ans-{ansible_asset['_id']}"
@@ -865,8 +867,6 @@ def main():
             if not asset_tag:
                 logging.debug(f"Asset tag not found for {ansible_asset['_id']}. Skipping.")
                 asset_tag = f"ans-{ansible_asset['_id']}"
-
-            snipe_asset = get_snipe_asset(serial=serial, computer_name=computer_name, asset_tag=asset_tag)
 
             logging.debug(f"Snipe returned: {snipe_asset}")
             if snipe_asset['total'] > 1:

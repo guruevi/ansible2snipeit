@@ -104,7 +104,7 @@ for entry in tree.findall('atom:entry', namespaces):
     # </content>
     # Get Details_Table0_ResourceID
     # Get Details_Table0_SerialNumber
-    serial_number = properties.find('ns2:Details_Table0_SerialNumber', namespaces).text
+    serial_number = clean_tag(properties.find('ns2:Details_Table0_SerialNumber', namespaces).text)
     resourceid = properties.find('ns2:Details_Table0_ResourceID', namespaces).text
     # Get Details_Table0_ComputerName
     computer_name = properties.find('ns2:Details_Table0_ComputerName', namespaces).text.upper()
@@ -137,18 +137,14 @@ for entry in tree.findall('atom:entry', namespaces):
     # Get Details_Table0_DiskSpaceMB
     disk_space = properties.find('ns2:Details_Table0_DiskSpaceMB', namespaces).text
 
-    serial_number = clean_tag(serial_number)
-
-    if not serial_number or str(serial_number).lower() == str(model).lower():
-        logging.error(f"No serial number for {computer_name}")
-        serial_number = f"sccm-{resourceid}"
-
-    if not asset_tag or str(asset_tag).lower() == str(model).lower():
-        asset_tag = f"sccm-{resourceid}"
-        logging.info(f"No asset tag for {computer_name}")
-
     if model:
         model = model.replace("Dell System ", "").replace("Dell ", "")
+
+    if str(serial_number).lower() == str(model).lower():
+        serial_number = ""
+
+    if str(asset_tag).lower() == str(model).lower():
+        asset_tag = ""
 
     model_id = get_snipe_model_id(model, manufacturer, "computer", 1)
     payload = {"name": computer_name, "serial": serial_number, "model_id": model_id, "asset_tag": asset_tag,
@@ -175,6 +171,14 @@ for entry in tree.findall('atom:entry', namespaces):
         macaddress = clean_mac(details.attrib['MAC_Address'])
 
     snipe_asset = get_snipe_asset(serial=serial_number, mac_address=macaddress, name=computer_name, asset_tag=asset_tag)
+
+    if not serial_number:
+        logging.error(f"No serial number for {computer_name}")
+        payload['serial'] = f"sccm-{resourceid}"
+
+    if not asset_tag:
+        logging.info(f"No asset tag for {computer_name}")
+        payload['asset_tag'] = f"sccm-{resourceid}"
 
     if snipe_asset['total'] > 1:
         logging.error(f"Multiple assets found for {serial_number}")
