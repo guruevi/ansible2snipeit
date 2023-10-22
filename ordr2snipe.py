@@ -45,7 +45,7 @@ while next_page:
     response = get(ordr_url + next_page + query_param, auth=auth, verify=ordr_tls_verify)
     data = response.json()
 
-    if 'next' in data['MetaData'] and data['MetaData']['next']:
+    if 'MetaData' in data and 'next' in data['MetaData'] and data['MetaData']['next']:
         # Write next_page to disk in case we crash
         with open('last_page.txt', 'w') as the_file:
             the_file.write(next_page)
@@ -53,6 +53,11 @@ while next_page:
         next_page = data['MetaData']['next']
     else:
         next_page = None
+
+    if 'Devices' not in data:
+        if 'MacAddress' in data:
+            logging.info("Single device filtered")
+            data['Devices'] = [data]
 
     for device in data['Devices']:
         logging.info(f"Processing {device['deviceName']}")
