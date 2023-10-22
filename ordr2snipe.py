@@ -36,6 +36,7 @@ valid_params = ["os-type", "connStatus", "filter-by-ext-data", "type", "mac", "i
                 "clientMacToken", "subcategory", "softwareInstalled", "openPorts"]
 parameter = os.getenv('ORDR_PARAM', None)
 value = os.getenv('ORDR_VALUE', None)
+query_param = ""
 
 if parameter in valid_params:
     query_param = f"?{parameter}={value}"
