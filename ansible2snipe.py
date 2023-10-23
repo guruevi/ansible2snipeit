@@ -117,7 +117,6 @@ def search_ansible_name(name):
 # Function to look up a snipe asset by serial number.
 def get_snipe_asset(serial="", name="", mac_address="", asset_tag=""):
     response = {'total': 0}
-    api_url = ""
     serial = clean_tag(serial)
     name = clean_tag(name)
     mac_address = clean_mac(mac_address)
@@ -140,7 +139,7 @@ def get_snipe_asset(serial="", name="", mac_address="", asset_tag=""):
             return {'rows': [response], 'total': 1}
 
     found = []
-    if name and len(name) > 3:
+    if name and len(name) > 4:
         payload = {
             'search': name,
             'limit': 500
