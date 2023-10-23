@@ -222,7 +222,7 @@ while next_page:
                     del payload[value['field']]
 
             if macaddress and macaddress not in snipe_macaddress:
-                payload[snipe_macaddress_field[len(snipe_macaddress) + 1]] = macaddress
+                payload[snipe_macaddress_field[len(snipe_macaddress)]] = macaddress
 
             for key in asset:
                 if key in payload and html.unescape(str(asset[key])) == str(payload[key]):
