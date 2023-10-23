@@ -38,6 +38,8 @@ parameter = os.getenv('ORDR_PARAM', None)
 value = os.getenv('ORDR_VALUE', None)
 query_param = ""
 
+invalid_names = ["LGWEBOSID"]
+
 if parameter in valid_params:
     query_param = f"?{parameter}={value}"
 
@@ -128,7 +130,12 @@ while next_page:
         else:
             asset_tag = "ordr-" + name
 
-        snipe_asset = get_snipe_asset(serial=serial, mac_address=macaddress, name=name, asset_tag=asset_tag)
+        if name in invalid_names:
+            search_name = ""
+        else:
+            search_name = name
+
+        snipe_asset = get_snipe_asset(serial=serial, mac_address=macaddress, name=search_name, asset_tag=asset_tag)
 
         if snipe_asset['total'] > 1:
             logging.error(f"Multiple assets in Snipe-IT for {name}")
