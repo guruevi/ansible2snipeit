@@ -3,7 +3,7 @@
 from datetime import datetime
 import logging
 import os
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ElementTree
 
 import requests
 from requests_ntlm import HttpNtlmAuth
@@ -38,13 +38,13 @@ if not report_stat or (datetime.now().timestamp() - report_stat.st_mtime) > 8640
     f2.close()
 
 
-def validate_ip(ipaddress):
+def validate_ip(ip):
     # Validate this is an IPv4 address
     try:
-        ipaddress = ipaddress.split(".")
-        if len(ipaddress) != 4:
+        ip = ip.split(".")
+        if len(ip) != 4:
             return None
-        for octet in ipaddress:
+        for octet in ip:
             octet = int(octet)
             if octet < 1 or octet > 254:
                 return None
@@ -52,19 +52,19 @@ def validate_ip(ipaddress):
         return None
 
     # Check if this is a bogus IP address
-    if int(ipaddress[0]) in [127, 255]:
+    if int(ip[0]) in [127, 255]:
         return None
-    if int(ipaddress[0]) == 169 and int(ipaddress[1]) == 254:
+    if int(ip[0]) == 169 and int(ip[1]) == 254:
         return None
-    if int(ipaddress[0]) in range(224, 239):
+    if int(ip[0]) in range(224, 239):
         return None
 
-    return ".".join(ipaddress)
+    return ".".join(ip)
 
 
 # Open XML file
-tree = ET.parse("report.xml")
-tree2 = ET.parse("report2.xml")
+tree = ElementTree.parse("report.xml")
+tree2 = ElementTree.parse("report2.xml")
 namespaces = {'ns1': CONFIG['sccm']['namespace1'],
               'ns2': CONFIG['sccm']['namespace2'],
               'atom': 'http://www.w3.org/2005/Atom'}

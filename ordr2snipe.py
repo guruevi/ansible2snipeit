@@ -45,6 +45,7 @@ while next_page:
     # Get the first page of results
     response = get(ordr_url + next_page + query_param, auth=auth, verify=ordr_tls_verify)
     data = response.json()
+    logging.debug(data)
 
     if 'MetaData' in data and 'next' in data['MetaData'] and data['MetaData']['next']:
         # Write next_page to disk in case we crash
@@ -53,6 +54,11 @@ while next_page:
 
         next_page = data['MetaData']['next']
     else:
+        # Delete last_page.txt
+        try:
+            os.remove('last_page.txt')
+        except FileNotFoundError:
+            pass
         next_page = None
 
     if 'Devices' not in data:
