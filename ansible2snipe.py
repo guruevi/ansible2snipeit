@@ -139,20 +139,7 @@ def get_snipe_asset(serial="", name="", mac_address="", asset_tag=""):
             return {'rows': [response], 'total': 1}
 
     found = []
-    if name and len(name) > 4:
-        payload = {
-            'search': name,
-            'limit': 500
-        }
-        response = api_call("hardware", method="GET", payload=payload)
-
-        if 'rows' in response:
-            # Search is fuzzy
-            for row in response['rows']:
-                if html.unescape(row['name'].upper()) == name.upper():
-                    found.append(row)
-
-    if mac_address and len(found) == 0:
+    if mac_address:
         payload = {
             'search': mac_address,
             'limit': 500
@@ -164,6 +151,19 @@ def get_snipe_asset(serial="", name="", mac_address="", asset_tag=""):
                     if field['field_format'] == 'MAC' and field['value'].upper() == mac_address.upper():
                         found.append(row)
                         break
+
+    if len(found) == 0 and name and len(name) > 4:
+        payload = {
+            'search': name,
+            'limit': 500
+        }
+        response = api_call("hardware", method="GET", payload=payload)
+
+        if 'rows' in response:
+            # Search is fuzzy
+            for row in response['rows']:
+                if html.unescape(row['name'].upper()) == name.upper():
+                    found.append(row)
 
     response['rows'] = found
     response['total'] = len(found)
@@ -485,6 +485,46 @@ def clean_os(operating_system: str) -> str:
     return operating_system
 
 
+def fill_macfields(current_data, new_data, new_macs: list):
+    snipe_macaddress = []
+    free_mac_field = ['_snipeit_mac_address_1',
+                      '_snipeit_mac_address_2_5',
+                      '_snipeit_mac_address_3_6',
+                      '_snipeit_mac_address_4_7',
+                      '_snipeit_mac_address_5_19',
+                      '_snipeit_mac_address_6_20',
+                      '_snipeit_mac_address_7_21',
+                      '_snipeit_mac_address_8_22',
+                      '_snipeit_mac_address_9_23',
+                      '_snipeit_mac_address_10_24',
+                      '_snipeit_mac_address_11_25',
+                      '_snipeit_mac_address_12_26',
+                      '_snipeit_mac_address_13_27',
+                      '_snipeit_mac_address_14_28',
+                      '_snipeit_mac_address_15_29',
+                      '_snipeit_mac_address_16_30',
+                      '_snipeit_mac_address_17_31',
+                      '_snipeit_mac_address_18_32',
+                      '_snipeit_mac_address_19_33',
+                      '_snipeit_mac_address_20_34',
+                      '_snipeit_mac_address_21_35',
+                      '_snipeit_mac_address_22_36',
+                      '_snipeit_mac_address_23_37',
+                      '_snipeit_mac_address_24_38']
+    if current_data['total'] == 1:
+        for custom_field in current_data['rows'][0]['custom_fields'].values():
+            if custom_field['field_format'] == "MAC" and custom_field['value']:
+                snipe_macaddress.append(custom_field['value'])
+                free_mac_field.remove(custom_field['field'])
+
+    for mac in new_macs:
+        if free_mac_field and mac not in snipe_macaddress:
+            new_data[free_mac_field[0]] = mac
+            free_mac_field.pop(0)
+
+    return new_data
+
+
 def clean_tag(value: Any) -> str | None:
     invalid = ["na",
                "not available",
@@ -513,7 +553,9 @@ def clean_tag(value: Any) -> str | None:
                "chassis serial number"
                "123-1234-123",
                "..................",
-               "empty"]
+               "empty",
+               "varian",
+               "unknown"]
 
     if not value or len(str(value)) < 3 or str(value).lower() in invalid:
         return None
@@ -851,15 +893,15 @@ def main():
             model = get_os_config_value(os, 'model', ansible_asset['data'])
             manufacturer = clean_manufacturer(get_os_config_value(os, 'manufacturer', ansible_asset['data']))
 
-            snipe_asset = get_snipe_asset(serial=serial, computer_name=computer_name, asset_tag=asset_tag)
+            if not asset_tag:
+                logging.debug(f"Asset tag not found for {ansible_asset['_id']}. Skipping.")
+                asset_tag = f"ans-{ansible_asset['_id']}"
+
+            snipe_asset = get_snipe_asset(serial=serial, name=computer_name, asset_tag=asset_tag)
 
             if not serial:
                 logging.debug(f"Serial number not found for {ansible_asset['_id']}. Skipping.")
                 serial = f"ans-{ansible_asset['_id']}"
-
-            if not asset_tag:
-                logging.debug(f"Asset tag not found for {ansible_asset['_id']}. Skipping.")
-                asset_tag = f"ans-{ansible_asset['_id']}"
 
             logging.debug(f"Snipe returned: {snipe_asset}")
             if snipe_asset['total'] > 1:
@@ -894,8 +936,7 @@ def main():
                 logging.info(f"Creating a new asset in snipe for {ansible_asset['_id']}")
                 logging.debug(f"Creating new asset with payload: {payload}")
                 asset = create_snipe_asset(payload)
-
-            if snipe_asset['total'] == 1:
+            elif snipe_asset['total'] == 1:
                 logging.info(f"Existing asset in Snipe-IT for {ansible_asset['_id']}")
                 asset = snipe_asset['rows'][0]
                 update_time = asset['updated_at']['datetime']

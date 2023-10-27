@@ -18,5 +18,11 @@ This is based around https://github.com/grokability/jamf2snipe, but I've made so
 Uses SCCM to create objects in Snipe-IT based on SQL Reporting Services reports. Note these are highly specific
 and just intended as an example of how to parse them. You probably need to build a per-report middleware.
 
+### ordr2snipe.py
+Uses the Ordr API to create objects in Snipe-IT based on your Ordr inventory.
+
+### dellwarranty2snipe.py
+Uses the Dell Warranty API to update objects in Snipe-IT based on your Dell Service Tags.
+
 ## How to run this
 I run this in a Python virtual environment on a Cronicle server.

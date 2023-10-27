@@ -9,7 +9,7 @@ from requests import get
 from requests.auth import HTTPBasicAuth
 import logging
 from ansible2snipe import (CONFIG, clean_manufacturer, clean_tag, get_snipe_model_id, get_snipe_asset,
-                           update_snipe_asset, create_snipe_asset, clean_mac, clean_os)
+                           update_snipe_asset, create_snipe_asset, clean_mac, clean_os, fill_macfields)
 
 # Get the ORDR API key from CONFIG
 ordr_username = CONFIG.get('ordr', 'username')
@@ -155,8 +155,7 @@ while next_page:
             "model_id": model_id,
             "asset_tag": asset_tag,
             "_snipeit_vlan_17": vlan,
-            "_snipeit_vlan_name_18": vlanname,
-            "_snipeit_mac_address_1": device['MacAddress']
+            "_snipeit_vlan_name_18": vlanname
         }
 
         if 'IpAddress' in device:
@@ -187,41 +186,30 @@ while next_page:
             payload['_snipeit_os_version_9'] = os_version
 
         asset = {}
+        payload = fill_macfields(snipe_asset, payload, [macaddress])
+
         if snipe_asset['total'] == 0:
             logging.info(f"Creating a new asset in snipe for {name}")
             logging.debug(payload)
             asset = create_snipe_asset(payload)
-
-        if snipe_asset['total'] == 1:
+        elif snipe_asset['total'] == 1:
             logging.info(f"Existing asset in Snipe-IT for {name}")
             asset = snipe_asset['rows'][0]
-
             if (payload['serial'] == asset['serial'] or
                     payload['serial'].startswith('ordr-') or
                     not asset['serial'].startswith('ordr-')):
                 del payload['serial']
 
             # ORDR is less accurate on these things
-            if name == macaddress or asset['name'] != macaddress:
-                del payload['name']
+            del payload['name']
             del payload['asset_tag']
             del payload['model_id']
             del payload['status_id']
             del payload['category_id']
 
-            snipe_macaddress = []
-            snipe_macaddress_field = []
             for key, value in asset['custom_fields'].items():
-                if value['field_format'] == 'MAC':
-                    if value['value']:
-                        snipe_macaddress.append(value['value'])
-                    snipe_macaddress_field.append(value['field'])
-
-                if value['field'] in payload and value['value']:
+                if value['field_format'] != 'MAC' and value['field'] in payload and value['value']:
                     del payload[value['field']]
-
-            if macaddress and macaddress not in snipe_macaddress:
-                payload[snipe_macaddress_field[len(snipe_macaddress)]] = macaddress
 
             for key in asset:
                 if key in payload and html.unescape(str(asset[key])) == str(payload[key]):

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # Open XML file
+import html
 from datetime import datetime
 import logging
 import os
@@ -8,7 +9,8 @@ import xml.etree.ElementTree as ElementTree
 import requests
 from requests_ntlm import HttpNtlmAuth
 from ansible2snipe import (get_snipe_model_id, get_snipe_asset, clean_tag, create_snipe_asset, update_snipe_asset,
-                           checkout_snipe_asset, USER_ARGS, CONFIG, clean_mac, clean_manufacturer)
+                           checkout_snipe_asset, USER_ARGS, CONFIG, clean_mac, clean_manufacturer, fill_macfields)
+import xmltodict
 
 # Stat file
 try:
@@ -64,10 +66,28 @@ def validate_ip(ip):
 
 # Open XML file
 tree = ElementTree.parse("report.xml")
-tree2 = ElementTree.parse("report2.xml")
-namespaces = {'ns1': CONFIG['sccm']['namespace1'],
-              'ns2': CONFIG['sccm']['namespace2'],
+with open('report2.xml') as fd:
+    network_doc = xmltodict.parse(fd.read())
+
+NETWORK_INFO = network_doc['feed']['entry']
+
+
+def find_network_info(name) -> dict[str]:
+    device_info = {}
+    for xmlentry in NETWORK_INFO:
+        this_computer = xmlentry['content']['m:properties']['d:Details_Table0_ComputerName']
+        if this_computer.upper() == name.upper():
+            ip = validate_ip(xmlentry['content']['m:properties']['d:IP_Address'])
+            mac = clean_mac(xmlentry['content']['m:properties']['d:MAC_Address'])
+            if ip and mac:
+                device_info[mac] = ip
+    return device_info
+
+
+namespaces = {'m': 'http://schemas.microsoft.com/ado/2007/08/dataservices/metadata',
+              'd': 'http://schemas.microsoft.com/ado/2007/08/dataservices',
               'atom': 'http://www.w3.org/2005/Atom'}
+starts_with = "CVMAPDCEPIC01"
 # For each entry tag
 for entry in tree.findall('atom:entry', namespaces):
     # Get the content tag
@@ -76,7 +96,7 @@ for entry in tree.findall('atom:entry', namespaces):
     # Parse 2023-10-07T13:21:09Z into datetime
     updated = datetime.strptime(updated, "%Y-%m-%dT%H:%M:%SZ")
 
-    properties = content.find('ns2:properties', namespaces)
+    properties = content.find('m:properties', namespaces)
     # Example
     # <content device_type="application/xml">
     # 	<m:properties>
@@ -104,38 +124,46 @@ for entry in tree.findall('atom:entry', namespaces):
     # </content>
     # Get Details_Table0_ResourceID
     # Get Details_Table0_SerialNumber
-    serial_number = clean_tag(properties.find('ns2:Details_Table0_SerialNumber', namespaces).text)
-    resourceid = properties.find('ns2:Details_Table0_ResourceID', namespaces).text
+    serial_number = clean_tag(properties.find('d:Details_Table0_SerialNumber', namespaces).text)
+    resourceid = properties.find('d:Details_Table0_ResourceID', namespaces).text
     # Get Details_Table0_ComputerName
-    computer_name = properties.find('ns2:Details_Table0_ComputerName', namespaces).text.upper()
+    computer_name = properties.find('d:Details_Table0_ComputerName', namespaces).text.upper()
+    if starts_with and computer_name != starts_with:
+        continue
+    starts_with = None
     # Get Details_Table0_Domain
     domain = properties.find(
-        'ns2:Details_Table0_DomainWorkgroup', namespaces).text
-    # Get Details_Table0_OU
-    ou = properties.find('ns2:Details_Table0_OU', namespaces).text
+        'd:Details_Table0_DomainWorkgroup', namespaces).text
+    # Get Details_Table0_OU, strip off the hostname
+    ou_raw = properties.find('d:Details_Table0_OU', namespaces).text
+
+    ou = ""
+    if ou_raw:
+        ou_parts = ou_raw.split("/")
+        ou = "/".join(ou_parts[0:-1])
     # Get Details_Table0_TopConsoleUser
     top_console_user = properties.find(
-        'ns2:Details_Table0_TopConsoleUser', namespaces).text
+        'd:Details_Table0_TopConsoleUser', namespaces).text
     # Get Details_Table0_OperatingSystem
     operating_system = properties.find(
-        'ns2:Details_Table0_OperatingSystem', namespaces).text.replace("Microsoft ", "")
+        'd:Details_Table0_OperatingSystem', namespaces).text.replace("Microsoft ", "")
     # Get Details_Table0_ServicePackLevel
     service_pack_level = properties.find(
-        'ns2:Details_Table0_ServicePackLevel', namespaces).text
+        'd:Details_Table0_ServicePackLevel', namespaces).text
 
     # Get Details_Table0_AssetTag
-    asset_tag = clean_tag(properties.find('ns2:Details_Table0_AssetTag', namespaces).text)
+    asset_tag = clean_tag(properties.find('d:Details_Table0_AssetTag', namespaces).text)
     # Get Details_Table0_Manufacturer
-    manufacturer = clean_manufacturer(properties.find('ns2:Details_Table0_Manufacturer', namespaces).text)
+    manufacturer = clean_manufacturer(properties.find('d:Details_Table0_Manufacturer', namespaces).text)
     # Get Details_Table0_Model
-    model = properties.find('ns2:Details_Table0_Model', namespaces).text
+    model = properties.find('d:Details_Table0_Model', namespaces).text
 
     memory = properties.find(
-        'ns2:Details_Table0_MemoryKBytes', namespaces).text
+        'd:Details_Table0_MemoryKBytes', namespaces).text
     # Get Processor_Name
-    processor_name = properties.find('ns2:Processor_Name', namespaces).text
+    processor_name = properties.find('d:Processor_Name', namespaces).text
     # Get Details_Table0_DiskSpaceMB
-    disk_space = properties.find('ns2:Details_Table0_DiskSpaceMB', namespaces).text
+    disk_space = properties.find('d:Details_Table0_DiskSpaceMB', namespaces).text
 
     if model:
         model = model.replace("Dell System ", "").replace("Dell ", "")
@@ -146,7 +174,7 @@ for entry in tree.findall('atom:entry', namespaces):
     if str(asset_tag).lower() == str(model).lower():
         asset_tag = ""
 
-    model_id = get_snipe_model_id(model, manufacturer, "computer", 1)
+    model_id = get_snipe_model_id(model, manufacturer, "computer")
     payload = {"name": computer_name, "serial": serial_number, "model_id": model_id, "asset_tag": asset_tag,
                "status_id": 2, "category_id": 2, '_snipeit_ram_2': round(int(memory) / 1024),
                '_snipeit_operating_system_8': operating_system}
@@ -163,58 +191,36 @@ for entry in tree.findall('atom:entry', namespaces):
     payload['_snipeit_storage_3'] = disk_space
     payload['_snipeit_cpu_name_14'] = processor_name
 
-    # Get MAC address from report2 which is a different report
-    details = tree2.find(f".//ns1:Detail[@Details_Table0_ComputerName='{computer_name}']", namespaces=namespaces)
-
-    macaddress = ""
-    if details is not None:
-        macaddress = clean_mac(details.attrib['MAC_Address'])
-
-    snipe_asset = get_snipe_asset(serial=serial_number, mac_address=macaddress, name=computer_name, asset_tag=asset_tag)
-
-    if not serial_number:
-        logging.error(f"No serial number for {computer_name}")
-        payload['serial'] = f"sccm-{resourceid}"
+    # Get network info
+    mac_addresses = find_network_info(computer_name)
+    if mac_addresses:
+        mac_address = next(iter(mac_addresses))
+        payload["_snipeit_ip_address_13"] = next(iter(mac_addresses.values()))
+    else:
+        mac_address = None
 
     if not asset_tag:
         logging.info(f"No asset tag for {computer_name}")
         payload['asset_tag'] = f"sccm-{resourceid}"
 
+    snipe_asset = get_snipe_asset(serial=serial_number,
+                                  mac_address=mac_address,
+                                  name=computer_name,
+                                  asset_tag=payload['asset_tag'])
+
+    if not serial_number:
+        logging.error(f"No serial number for {computer_name}")
+        payload['serial'] = f"sccm-{resourceid}"
+
     if snipe_asset['total'] > 1:
         logging.error(f"Multiple assets found for {serial_number}")
         continue
 
-    if details is not None:
-        ipaddress = validate_ip(details.attrib['IP_Address'])
-
-        if ipaddress:
-            payload["_snipeit_ip_address_13"] = ipaddress
-
-        snipe_macaddress = []
-        if 'custom_fields' in snipe_asset:
-            snipe_macaddress[0] = snipe_asset['custom_fields']['MAC Address']['value']
-            snipe_macaddress[1] = snipe_asset['custom_fields']['MAC Address 2']['value']
-            snipe_macaddress[2] = snipe_asset['custom_fields']['MAC Address 3']['value']
-            snipe_macaddress[3] = snipe_asset['custom_fields']['MAC Address 4']['value']
-
-        if macaddress and macaddress not in snipe_macaddress:
-            if not snipe_macaddress:
-                payload['_snipeit_mac_address_1'] = macaddress
-            elif not snipe_macaddress[0]:
-                payload["_snipeit_mac_address_1"] = macaddress
-            elif not snipe_macaddress[1]:
-                payload["_snipeit_mac_address_2_5"] = macaddress
-            elif not snipe_macaddress[2]:
-                payload["_snipeit_mac_address_3_6"] = macaddress
-            elif not snipe_macaddress[3]:
-                payload["_snipeit_mac_address_4_7"] = macaddress
-            else:
-                payload["_snipeit_mac_address_1"] = macaddress
+    payload = fill_macfields(snipe_asset, payload, mac_addresses)
 
     if not snipe_asset['total']:
         asset = create_snipe_asset(payload)
-
-    if snipe_asset['total'] == 1:
+    elif snipe_asset['total'] == 1:
         asset = snipe_asset['rows'][0]
         asset_id = asset['id']
 
@@ -225,9 +231,9 @@ for entry in tree.findall('atom:entry', namespaces):
             logging.info(f"Skipping update for {asset['id']} because the Snipe record is newer.")
             continue
 
-        if asset['serial'] == payload['serial'] or serial_number.startswith('sccm'):
+        if asset['serial'] == payload['serial'] or payload['serial'].startswith('sccm'):
             del payload['serial']
-        if asset['asset_tag'] == payload['asset_tag'] or asset_tag.startswith('sccm'):
+        if asset['asset_tag'] == payload['asset_tag'] or payload['asset_tag'].startswith('sccm'):
             del payload['asset_tag']
         if asset['name'] == payload['name']:
             del payload['name']
@@ -238,8 +244,11 @@ for entry in tree.findall('atom:entry', namespaces):
         if asset['category']['id'] == payload['category_id']:
             del payload['category_id']
 
+        if asset['custom_fields']['IP Address']['field'] in payload and asset['custom_fields']['IP Address']['value']:
+            del payload[asset['custom_fields']['IP Address']['field']]
+
         for key, value in asset['custom_fields'].items():
-            if value['field'] in payload and str(payload[value['field']]) == str(value['value']):
+            if value['field'] in payload and str(payload[value['field']]) == html.unescape(str(value['value'])):
                 del payload[value['field']]
 
         # Update asset
