@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from datetime import datetime
-
+from requests.exceptions import JSONDecodeError
 from dell_api.__main__ import DellApi
 
 dell_api = DellApi()
@@ -30,12 +30,16 @@ while offset <= total:
     if not serials:
         continue
 
-    warranties = dell_api.asset_warranty(list(serials.keys()))
+    try:
+        warranties = dell_api.asset_warranty(list(serials.keys()))
+    except JSONDecodeError:
+        print(f"Invalid key in {serials.keys()}")
+        continue
+
     for warranty in warranties:
         payload = {}
         # We need to find purchase_date
         # We need to find warranty_months
-        # {'id': 2077717341, 'serviceTag': '8B3Y4Y3', 'orderBuid': 11, 'shipDate': '2023-10-09T05:00:00Z', 'productCode': '>/226', 'localChannel': '84', 'productId': None, 'productLineDescription': 'LATITUDE 5540', 'productFamily': None, 'systemDescription': None, 'productLobDescription': 'Latitude', 'countryCode': 'US', 'duplicated': False, 'invalid': False, 'entitlements': [{'itemNumber': '812-3888', 'startDate': '2023-10-09T05:00:00Z', 'endDate': '2027-01-07T05:59:59.000001Z', 'entitlementType': 'INITIAL', 'serviceLevelCode': 'ND', 'serviceLevelDescription': 'Onsite Service After Remote Diagnosis (Consumer Customer)/ Next Business Day Onsite After Remote Diagnosis (for business Customer)', 'serviceLevelGroup': 5}]}
         url = f'hardware/{serials[warranty["serviceTag"]]}'
         if 'shipDate' not in warranty or not warranty['shipDate']:
             continue
@@ -68,4 +72,3 @@ while offset <= total:
 
         if payload:
             api_call(f"hardware/{serials[warranty['serviceTag']]}", method='PATCH', payload=payload)
-

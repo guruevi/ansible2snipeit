@@ -30,7 +30,6 @@
 #
 import html
 from functools import lru_cache
-from time import sleep
 from typing import Any, Iterable
 
 from pymongo import MongoClient
@@ -50,47 +49,6 @@ MANUFACTURERS = {}
 DB: Any = None
 SNIPE_RATE_LIMIT = 1000
 CONFIG = {}
-
-
-def request_handler(r, *args, **kwargs):
-    # Implement rate limiting if username requests it
-    global API_COUNT, USER_ARGS, FIRST_API_CALL
-    if '"messages":429' in r.text:
-        if USER_ARGS.ratelimited:
-            logging.warning(
-                "Despite respecting the rate limit of Snipe, we've still been limited. Trying again after sleeping for "
-                "2 seconds.")
-            sleep(2)
-            re_req = r.request
-            s = requests.Session()
-            return s.send(re_req)
-
-        logging.error(r.content)
-        raise SystemExit(
-            "We've been rate limited. Use option -r to sleep between requests to avoid this.")
-
-    if not FIRST_API_CALL:
-        FIRST_API_CALL = datetime.now()
-
-    time_elapsed = datetime.now() - FIRST_API_CALL
-
-    api_rate = 0
-    if time_elapsed.seconds:
-        api_rate = API_COUNT / time_elapsed.seconds
-
-    max_rate = (SNIPE_RATE_LIMIT / 60) * .95
-    API_COUNT += 1
-
-    if USER_ARGS.ratelimited and api_rate > max_rate:
-        sleep_time = 0.5 + (api_rate - max_rate)
-        logging.debug(f'Rate limit {api_rate}/minute, sleeping for {sleep_time}')
-        sleep(sleep_time)
-
-    logging.debug(
-        f"Made {API_COUNT} requests to Snipe IT in {time_elapsed} seconds, "
-        f"with a request being sent at {api_rate}/second")
-
-    return r
 
 
 def do_mongo_query(query):
@@ -181,14 +139,11 @@ def api_call(endpoint, payload=None, method="GET"):
     api_url = f"{CONFIG['snipe-it']['url']}/api/v1/{endpoint}"
     if method == "GET":
         logging.debug(f"Calling: {api_url}")
-        response = requests.get(api_url, headers=snipe_headers, json=payload, verify=USER_ARGS.do_not_verify_ssl,
-                                hooks={'response': request_handler})
+        response = requests.get(api_url, headers=snipe_headers, json=payload, verify=USER_ARGS.do_not_verify_ssl)
     elif method == "POST":
-        response = requests.post(api_url, headers=snipe_headers, json=payload, verify=USER_ARGS.do_not_verify_ssl,
-                                 hooks={'response': request_handler})
+        response = requests.post(api_url, headers=snipe_headers, json=payload, verify=USER_ARGS.do_not_verify_ssl)
     elif method == "PATCH":
-        response = requests.patch(api_url, headers=snipe_headers, json=payload, verify=USER_ARGS.do_not_verify_ssl,
-                                  hooks={'response': request_handler})
+        response = requests.patch(api_url, headers=snipe_headers, json=payload, verify=USER_ARGS.do_not_verify_ssl)
     else:
         logging.error(f"Unknown method {method}")
         raise SystemExit("Unknown method")
@@ -528,34 +483,29 @@ def fill_macfields(current_data, new_data, new_macs: list):
 def clean_tag(value: Any) -> str | None:
     invalid = ["na",
                "not available",
-               "to be filled by o.e.m.",
-               "to be filled by o.e.m",
-               "to be filled by oem",
-               "system serial number",
                "0123456789",
                "1234567890",
                "default string",
-               "no asset tag",
-               "asset tag",
                "not specified",
-               "system manufacturer",
                "0",
-               "system product name",
                "null",
                "none",
                "main board",
                "0000000000",
                "7783-7084-3265-9085-8269-3286-77",
-               "no asset information",
                "tangent197",
                "isd_pcs",
                "cbx3__",
-               "chassis serial number"
                "123-1234-123",
                "..................",
                "empty",
                "varian",
                "unknown"]
+    if ('chassis' in value.lower() or
+            'asset' in value.lower() or
+            'to be filled' in value.lower() or
+            'system' in value.lower()):
+        return None
 
     if not value or len(str(value)) < 3 or str(value).lower() in invalid:
         return None
