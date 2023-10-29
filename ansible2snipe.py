@@ -425,8 +425,26 @@ def get_config_value(config_key, data, invalid_values=None):
 
 
 def clean_mac(mac_address: str) -> str | None:
-    if not mac_address or mac_address.startswith('0A:00:27'):
+    # Return first 3 parts of MAC address
+    if not mac_address:
         return None
+
+    bad_macs = []
+    if mac_address in bad_macs:
+        return None
+
+    mac_address_parts = mac_address.upper().split(':')
+    mac_address_prefix = "".join(mac_address_parts[:3])
+
+    # Bad MAC addresses
+    # 00:00:00:00:00:00 -> invalid
+    # 0A:00:27:00:00:00 -> VirtualBox
+    # 80:69:1A:00:00:00 -> Belkin (USB network adapters)
+    bad_prefix = ['000000', '0A0027', '80691A']
+
+    if mac_address_prefix in bad_prefix:
+        return None
+
     return mac_address
 
 
