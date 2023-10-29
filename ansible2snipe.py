@@ -453,8 +453,12 @@ def clean_mac(mac_address: str) -> str | None:
     # Bad MAC addresses
     # 00:00:00:00:00:00 -> invalid
     # 0A:00:27:00:00:00 -> VirtualBox
-    # 80:69:1A:00:00:00 -> Belkin (USB network adapters)
-    bad_prefix = ['00:00:00', '0A:00:27', '80:69:1A']
+    bad_prefix = ['00:00:00', '0A:00:27',
+                  # Belkin (USB network adapters)
+                  '80:69:1A', 'EC:1A:59', 'C4:41:1E', 'C0:56:27', 'B4:75:0E', '94:44:52', '94:10:3E', '60:38:E0',
+                  '58:EF:68', '30:23:03', '24:F5:A2', '14:91:82', '08:86:3B', '00:30:BD', '00:22:75', '00:1C:DF',
+                  '00:17:3F', '00:11:50', 'E8:9F:80'
+                  ]
 
     if mac_address[:8] in bad_prefix:
         return None
