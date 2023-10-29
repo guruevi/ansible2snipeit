@@ -501,13 +501,14 @@ def clean_tag(value: Any) -> str | None:
                "empty",
                "varian",
                "unknown"]
-    if ('chassis' in value.lower() or
-            'asset' in value.lower() or
-            'to be filled' in value.lower() or
-            'system' in value.lower()):
+    if not value or len(str(value)) < 3 or str(value).lower() in invalid:
         return None
 
-    if not value or len(str(value)) < 3 or str(value).lower() in invalid:
+    value_lower = str(value).lower()
+    if ('chassis' in value_lower or
+            'asset' in value_lower or
+            'to be filled' in value_lower or
+            'system' in value_lower):
         return None
 
     logging.debug(f"Clean tag: {value}")
