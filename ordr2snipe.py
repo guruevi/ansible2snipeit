@@ -20,12 +20,13 @@ ordr_tls_verify = CONFIG.getboolean('ordr', 'tls_verify')
 # Basic Auth
 auth = HTTPBasicAuth(ordr_username, ordr_password)
 
+next_page = "/Rest/Devices"
 # Get the first page from a save place
-try:
-    with open('last_page.txt', 'r') as the_file:
-        next_page = the_file.read()
-except FileNotFoundError:
-    next_page = "/Rest/Devices"
+# try:
+#     with open('last_page.txt', 'r') as the_file:
+#         next_page = the_file.read()
+# except FileNotFoundError:
+#     pass
 
 # Get environment variables
 valid_params = ["os-type", "connStatus", "filter-by-ext-data", "type", "mac", "iot", "weakPassword", "attribute-filter",
@@ -39,26 +40,25 @@ value = os.getenv('ORDR_VALUE', None)
 query_param = ""
 
 if parameter in valid_params:
-    query_param = f"?{parameter}={value}"
+    next_page = f"{next_page}?{parameter}={value}"
 
 while next_page:
     # Get the first page of results
-    response = get(ordr_url + next_page + query_param, auth=auth, verify=ordr_tls_verify)
+    response = get(ordr_url + next_page, auth=auth, verify=ordr_tls_verify)
     data = response.json()
     logging.debug(data)
 
     if 'MetaData' in data and 'next' in data['MetaData'] and data['MetaData']['next']:
         # Write next_page to disk in case we crash
-        with open('last_page.txt', 'w') as the_file:
-            the_file.write(next_page)
-
+        # with open('last_page.txt', 'w') as the_file:
+        #     the_file.write(next_page)
         next_page = data['MetaData']['next']
     else:
         # Delete last_page.txt
-        try:
-            os.remove('last_page.txt')
-        except FileNotFoundError:
-            pass
+        # try:
+        #     os.remove('last_page.txt')
+        # except FileNotFoundError:
+        #     pass
         next_page = None
 
     if 'Devices' not in data:
