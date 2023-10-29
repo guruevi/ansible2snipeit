@@ -71,8 +71,8 @@ def search_ansible_name(name):
 
 
 # Function to look up a snipe asset by serial number.
-def get_snipe_asset(serial="", name="", mac_addresses=None, asset_tag=""):
-    if not mac_addresses or not isinstance(mac_addresses, Iterable):
+def get_snipe_asset(serial="", name="", mac_addresses=None, asset_tag="") -> dict:
+    if not mac_addresses:
         mac_addresses = []
     response = {'total': 0}
     serial = clean_tag(serial)
@@ -86,18 +86,14 @@ def get_snipe_asset(serial="", name="", mac_addresses=None, asset_tag=""):
             continue
         clean_macaddresses.append(mac_address)
 
-    # If we have a serial number always use that to uniquely identify the asset
+    # If we have a valid serial number always use that to uniquely identify the asset
     if serial:
         api_url = f'hardware/byserial/{serial}'
         response = api_call(api_url)
-        if 'total' in response:
-            if response['total'] == 1:
-                return response
-            elif response['total'] > 1:
-                logging.error(f"Got multiple responses for a serial number")
-                raise SystemExit("Multiple responses for a serial number")
-            else:
-                return None
+        if 'total' in response and response['total']:
+            return response
+
+        return {'total': 0}
 
     # Asset tags are less precise, if not found, we can use MAC address as fallback
     if asset_tag:
@@ -475,7 +471,7 @@ def clean_os(operating_system: str) -> str:
     return operating_system
 
 
-def fill_macfields(current_data, new_data, new_macs: list):
+def fill_macfields(current_data: dict, new_data: dict, new_macs: list):
     snipe_macaddress = []
     free_mac_field = ['_snipeit_mac_address_1',
                       '_snipeit_mac_address_2_5',
