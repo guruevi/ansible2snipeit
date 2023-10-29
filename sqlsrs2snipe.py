@@ -202,14 +202,12 @@ for entry in tree.findall('atom:entry', namespaces):
     else:
         mac_address = None
 
-    payload = fill_macfields(snipe_asset, payload, mac_addresses)
-
     if not asset_tag:
         logging.info(f"No asset tag for {computer_name}")
         payload['asset_tag'] = f"sccm-{resourceid}"
 
     snipe_asset = get_snipe_asset(serial=serial_number,
-                                  mac_address=mac_addresses,
+                                  mac_addresses=mac_addresses,
                                   name=computer_name,
                                   asset_tag=payload['asset_tag'])
 
@@ -220,6 +218,8 @@ for entry in tree.findall('atom:entry', namespaces):
     if snipe_asset['total'] > 1:
         logging.error(f"Multiple assets found for {serial_number}")
         continue
+
+    payload = fill_macfields(snipe_asset, payload, list(mac_addresses.keys()))
 
     if not snipe_asset['total']:
         asset = create_snipe_asset(payload)
