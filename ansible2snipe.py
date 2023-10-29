@@ -80,6 +80,7 @@ def get_snipe_asset(serial="", name="", mac_address="", asset_tag=""):
     mac_address = clean_mac(mac_address)
     asset_tag = clean_tag(asset_tag)
 
+    # If we have a serial number always use that to uniquely identify the asset
     if serial:
         api_url = f'hardware/byserial/{serial}'
         response = api_call(api_url)
@@ -89,13 +90,17 @@ def get_snipe_asset(serial="", name="", mac_address="", asset_tag=""):
             elif response['total'] > 1:
                 logging.error(f"Got multiple responses for a serial number")
                 raise SystemExit("Multiple responses for a serial number")
+            else:
+                return None
 
+    # Asset tags are less precise, if not found, we can use MAC address as fallback
     if asset_tag:
         api_url = f'hardware/bytag/{asset_tag}'
         response = api_call(api_url)
         if 'id' in response:
             return {'rows': [response], 'total': 1}
 
+    # MAC addresses *should* be unique but not always
     found = []
     if mac_address:
         payload = {
@@ -110,6 +115,7 @@ def get_snipe_asset(serial="", name="", mac_address="", asset_tag=""):
                         found.append(row)
                         break
 
+    # If we have a name, we can search for that
     if len(found) == 0 and name and len(name) > 4:
         payload = {
             'search': name,
