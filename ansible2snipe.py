@@ -42,8 +42,6 @@ from jinja2 import Template
 from pymongo.errors import PyMongoError
 
 version = "0.1"
-API_COUNT = 0
-FIRST_API_CALL = None
 MODELNUMBERS = {}
 MANUFACTURERS = {}
 DB: Any = None
@@ -294,9 +292,8 @@ def checkin_snipe_asset(asset_id):
 def get_snipe_technicians():
     # TODO: Get this list from snipe (group based)
     global CONFIG
-    if 'technicians' not in CONFIG['snipe-it']:
-        return []
-    return CONFIG['snipe-it']['technicians'].split(' ')
+    technicians = CONFIG['snipe-it'].get('technicians', "")
+    return technicians.split(' ')
 
 
 # Function that checks out an asset in snipe
@@ -433,7 +430,7 @@ def get_config_value(config_key, data, invalid_values=None):
 
     if j2_str:
         template = Template(j2_str)
-        value = template.render(var=value, data=data)
+        value = template.render(var=value, data=data, clean_mac=clean_mac, clean_tag=clean_tag)
 
     logging.debug(f"Got value {value} for {config_key}")
     return value
@@ -457,7 +454,9 @@ def clean_mac(mac_address: str) -> str | None:
                   # Belkin (USB network adapters)
                   '80:69:1A', 'EC:1A:59', 'C4:41:1E', 'C0:56:27', 'B4:75:0E', '94:44:52', '94:10:3E', '60:38:E0',
                   '58:EF:68', '30:23:03', '24:F5:A2', '14:91:82', '08:86:3B', '00:30:BD', '00:22:75', '00:1C:DF',
-                  '00:17:3F', '00:11:50', 'E8:9F:80'
+                  '00:17:3F', '00:11:50', 'E8:9F:80',
+                  # CE Link (USB network adapters)
+                  '6C:6E:07', '70:B3:D5', 'A0:CE:C8'
                   ]
 
     if mac_address[:8] in bad_prefix:
@@ -823,18 +822,7 @@ logging.info("SSL Verification is set to: {}".format(USER_ARGS.do_not_verify_ssl
 
 
 def main():
-    global API_COUNT, DB, CONFIG
-
-    # Do some tests to see if the hosts are up. Don't use hooks for these as we don't have tokens yet.
-    logging.info("Running tests to see if hosts are up.")
-
-    response = api_call("ping", method="GET")
-    if not response.text:
-        logging.error('Snipe-IT looks like it is down from here. \n'
-                      'Please check your CONFIG in the settings.conf file, or your instance.')
-        raise SystemExit("Error: Host could not be contacted.")
-
-    logging.info('We were able to get a good response from your Snipe-IT instance.')
+    global DB, CONFIG
 
     try:
         ansible_base = CONFIG['ansible']['url']
@@ -968,10 +956,6 @@ def main():
                 username = get_os_config_value(os, 'user_field', ansible_asset['data'])
                 logging.debug(f"User is {username}")
                 checkout_snipe_asset(username, asset)
-
-                # If there is no username, it is possible the username is logged out, make no changes
-
-    logging.debug('Total amount of API calls made: {}'.format(API_COUNT))
 
 
 if __name__ == "__main__":
