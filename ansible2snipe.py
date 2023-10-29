@@ -73,12 +73,20 @@ def search_ansible_name(name):
 
 
 # Function to look up a snipe asset by serial number.
-def get_snipe_asset(serial="", name="", mac_address="", asset_tag=""):
+def get_snipe_asset(serial="", name="", mac_addresses=None, asset_tag=""):
+    if not mac_addresses or not isinstance(mac_addresses, Iterable):
+        mac_addresses = []
     response = {'total': 0}
     serial = clean_tag(serial)
     name = clean_tag(name)
-    mac_address = clean_mac(mac_address)
     asset_tag = clean_tag(asset_tag)
+
+    clean_macaddresses = []
+    for mac_address in mac_addresses:
+        mac_address = clean_mac(mac_address)
+        if not mac_address:
+            continue
+        clean_macaddresses.append(mac_address)
 
     # If we have a serial number always use that to uniquely identify the asset
     if serial:
@@ -101,8 +109,8 @@ def get_snipe_asset(serial="", name="", mac_address="", asset_tag=""):
             return {'rows': [response], 'total': 1}
 
     # MAC addresses *should* be unique but not always
-    found = []
-    if mac_address:
+    found = {}
+    for mac_address in clean_macaddresses:
         payload = {
             'search': mac_address,
             'limit': 500
@@ -112,7 +120,7 @@ def get_snipe_asset(serial="", name="", mac_address="", asset_tag=""):
             for row in response['rows']:
                 for field_name, field in row['custom_fields'].items():
                     if field['field_format'] == 'MAC' and field['value'].upper() == mac_address.upper():
-                        found.append(row)
+                        found[row['id']] = row
                         break
 
     # If we have a name, we can search for that
@@ -127,9 +135,10 @@ def get_snipe_asset(serial="", name="", mac_address="", asset_tag=""):
             # Search is fuzzy
             for row in response['rows']:
                 if html.unescape(row['name'].upper()) == name.upper():
-                    found.append(row)
+                    found[row['id']] = row
 
-    response['rows'] = found
+    # Make a list from the found dict
+    response['rows'] = list(found.values())
     response['total'] = len(found)
 
     return response

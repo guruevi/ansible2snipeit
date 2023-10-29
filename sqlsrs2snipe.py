@@ -187,9 +187,12 @@ for entry in tree.findall('atom:entry', namespaces):
     if domain.isalnum() or domain.replace("-", "").replace("_", "").isalnum():
         payload['_snipeit_domain_11'] = domain
 
-    payload['_snipeit_ou_12'] = ou
-    payload['_snipeit_storage_3'] = disk_space
-    payload['_snipeit_cpu_name_14'] = processor_name
+    if ou:
+        payload['_snipeit_ou_12'] = ou
+    if disk_space:
+        payload['_snipeit_storage_3'] = disk_space
+    if processor_name:
+        payload['_snipeit_cpu_name_14'] = processor_name
 
     # Get network info
     mac_addresses = find_network_info(computer_name)
@@ -199,12 +202,14 @@ for entry in tree.findall('atom:entry', namespaces):
     else:
         mac_address = None
 
+    payload = fill_macfields(snipe_asset, payload, mac_addresses)
+
     if not asset_tag:
         logging.info(f"No asset tag for {computer_name}")
         payload['asset_tag'] = f"sccm-{resourceid}"
 
     snipe_asset = get_snipe_asset(serial=serial_number,
-                                  mac_address=mac_address,
+                                  mac_address=mac_addresses,
                                   name=computer_name,
                                   asset_tag=payload['asset_tag'])
 
@@ -215,8 +220,6 @@ for entry in tree.findall('atom:entry', namespaces):
     if snipe_asset['total'] > 1:
         logging.error(f"Multiple assets found for {serial_number}")
         continue
-
-    payload = fill_macfields(snipe_asset, payload, mac_addresses)
 
     if not snipe_asset['total']:
         asset = create_snipe_asset(payload)
@@ -248,7 +251,8 @@ for entry in tree.findall('atom:entry', namespaces):
             del payload[asset['custom_fields']['IP Address']['field']]
 
         for key, value in asset['custom_fields'].items():
-            if value['field'] in payload and str(payload[value['field']]) == html.unescape(str(value['value'])):
+            if (value['field'] in payload and
+                    str(payload[value['field']]).strip() == html.unescape(str(value['value'])).strip()):
                 del payload[value['field']]
 
         # Update asset
