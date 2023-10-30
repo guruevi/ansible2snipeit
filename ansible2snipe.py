@@ -93,9 +93,7 @@ def get_snipe_asset(serial="", name="", mac_addresses=None, asset_tag="") -> dic
         if 'total' in response and response['total']:
             return response
 
-        return {'total': 0}
-
-    # Asset tags are less precise, if not found, we can use MAC address as fallback
+    # Asset tags are less precise but always return 1 result
     if asset_tag:
         api_url = f'hardware/bytag/{asset_tag}'
         response = api_call(api_url)
