@@ -134,7 +134,7 @@ while next_page:
         else:
             asset_tag = "ordr-" + name
 
-        snipe_asset = get_snipe_asset(serial=serial, name=name, mac_address=[macaddress], asset_tag=asset_tag)
+        snipe_asset = get_snipe_asset(serial=serial, name=name, mac_addresses=[macaddress], asset_tag=asset_tag)
 
         if snipe_asset['total'] > 1:
             logging.error(f"Multiple assets in Snipe-IT for {name}")
