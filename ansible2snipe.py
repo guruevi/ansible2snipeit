@@ -458,6 +458,13 @@ def clean_mac(mac_address: str) -> str | None:
     if mac_address[:8] in bad_prefix:
         return None
 
+    # Bad MAC addresses
+    # Cisco AnyConnect
+    # 00:05:9A:3C:7A:00
+    bad_macs = ['00:05:9A:3C:7A:00', '00:05:9A:3C:78:00']
+    if mac_address in bad_macs:
+        return None
+
     return mac_address
 
 
