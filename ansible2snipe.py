@@ -444,23 +444,27 @@ def clean_mac(mac_address: str) -> str | None:
     # Bad MAC addresses
     # 00:00:00:00:00:00 -> invalid
     # 0A:00:27:00:00:00 -> VirtualBox
-    bad_prefix = ['00:00:00', '0A:00:27',
+    bad_prefix = ['00:00:00',
+                  # VirtualBox is always sequential starting from 1 so collissions happen frequently
+                  '0A:00:27',
+                  # HyperV
+                  # '00:15:5D',
                   # Belkin (USB network adapters)
                   '80:69:1A', 'EC:1A:59', 'C4:41:1E', 'C0:56:27', 'B4:75:0E', '94:44:52', '94:10:3E', '60:38:E0',
                   '58:EF:68', '30:23:03', '24:F5:A2', '14:91:82', '08:86:3B', '00:30:BD', '00:22:75', '00:1C:DF',
                   '00:17:3F', '00:11:50', 'E8:9F:80',
                   # CE Link (USB network adapters)
-                  '6C:6E:07', '70:B3:D5', 'A0:CE:C8'
+                  '6C:6E:07', '70:B3:D5', 'A0:CE:C8',
+                  # Cable Matters (USB network adapters)
+                  'F4:4D:AD', '5C:85:7E:30', '70:88:6B:80',
+                  # Cisco AnyConnect
+                  '00:05:9A:3C:7A:00', '00:05:9A:3C:78:00',
+                  # GlobalProtect
+                  '02:50:41:00:00:01'
                   ]
 
-    if mac_address[:8] in bad_prefix:
-        return None
-
-    # Bad MAC addresses
-    # Cisco AnyConnect
-    # 00:05:9A:3C:7A:00
-    bad_macs = ['00:05:9A:3C:7A:00', '00:05:9A:3C:78:00']
-    if mac_address in bad_macs:
+    # :11 is /28
+    if mac_address in bad_prefix or mac_address[:11] in bad_prefix or mac_address[:8] in bad_prefix:
         return None
 
     return mac_address
