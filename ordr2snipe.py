@@ -45,6 +45,7 @@ if parameter in valid_params:
 while next_page:
     # Get the first page of results
     response = get(ordr_url + next_page, auth=auth, verify=ordr_tls_verify)
+    print(response.text)
     data = response.json()
     logging.debug(data)
 

@@ -463,6 +463,8 @@ def clean_mac(mac_address: str) -> str | None:
                   '00:05:9A:3C:7A:00', '00:05:9A:3C:78:00',
                   # GlobalProtect
                   '02:50:41:00:00:01'
+                  # Apple USB dongles
+                  '5C:F7:E6:8B'
                   ]
 
     # :11 is /28
