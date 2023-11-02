@@ -449,6 +449,8 @@ def clean_mac(mac_address: str) -> str | None:
                   '0A:00:27',
                   # HyperV
                   # '00:15:5D',
+                  # VMWare network adapters for vmnet0-8
+                  '00:50:56:C0',
                   # Belkin (USB network adapters)
                   '80:69:1A', 'EC:1A:59', 'C4:41:1E', 'C0:56:27', 'B4:75:0E', '94:44:52', '94:10:3E', '60:38:E0',
                   '58:EF:68', '30:23:03', '24:F5:A2', '14:91:82', '08:86:3B', '00:30:BD', '00:22:75', '00:1C:DF',
