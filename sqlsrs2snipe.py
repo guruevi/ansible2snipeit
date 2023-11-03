@@ -184,7 +184,7 @@ for entry in tree.findall('atom:entry', namespaces):
         payload['_snipeit_os_version_9'] = service_pack_level
 
     # Make sure domain is valid
-    if domain.isalnum() or domain.replace("-", "").replace("_", "").isalnum():
+    if domain and (domain.isalnum() or domain.replace("-", "").replace("_", "").isalnum()):
         payload['_snipeit_domain_11'] = domain
 
     if ou:

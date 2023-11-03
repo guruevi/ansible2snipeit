@@ -452,11 +452,12 @@ def clean_mac(mac_address: str) -> str | None:
                   # VMWare network adapters for Player
                   '00:50:56:C0',
                   # Belkin (USB network adapters)
-                  '80:69:1A', 'EC:1A:59', 'C4:41:1E', 'C0:56:27', 'B4:75:0E', '94:44:52', '94:10:3E', '60:38:E0',
-                  '58:EF:68', '30:23:03', '24:F5:A2', '14:91:82', '08:86:3B', '00:30:BD', '00:22:75', '00:1C:DF',
-                  '00:17:3F', '00:11:50', 'E8:9F:80',
+                  '00:17:3F', '00:1C:DF', '00:22:75', '08:86:3B', '14:91:82', '24:F5:A2', '30:23:03', '58:EF:68',
+                  '60:38:E0', '80:69:1A', '94:10:3E', '94:44:52', 'B4:75:0E', 'C0:56:27', 'C4:41:1E', 'D8:EC:5E',
+                  'E8:9F:80', 'EC:1A:59',
+                  '00:11:50', '00:30:BD',
                   # CE Link (USB network adapters)
-                  '6C:6E:07', '70:B3:D5', 'A0:CE:C8',
+                  '6C:6E:07', '70:B3:D5:54', 'A0:CE:C8',
                   # Cable Matters (USB network adapters)
                   'F4:4D:AD', '5C:85:7E:30', '70:88:6B:80',
                   # Cisco AnyConnect
