@@ -530,8 +530,6 @@ def fill_macfields(current_data: dict, new_data: dict, new_macs: list):
 def clean_tag(value: Any) -> str | None:
     invalid = ["na",
                "not available",
-               "0123456789",
-               "1234567890",
                "default string",
                "not specified",
                "0",
@@ -539,6 +537,7 @@ def clean_tag(value: Any) -> str | None:
                "none",
                "main board",
                "0000000000",
+               # Azure VM
                "7783-7084-3265-9085-8269-3286-77",
                "tangent197",
                "isd_pcs",
@@ -548,16 +547,17 @@ def clean_tag(value: Any) -> str | None:
                "empty",
                "varian",
                "unknown",
-               "dip-718s",
-               "asset-1234567890"]
-    if not value or len(str(value)) < 3 or str(value).lower() in invalid:
+               "dip-718s"]
+    value_lower = str(value).lower()
+
+    if not value_lower or len(value_lower) < 3 or value_lower in invalid:
         return None
 
-    value_lower = str(value).lower()
     if ('chassis' in value_lower or
             'asset' in value_lower or
             'to be filled' in value_lower or
-            'system' in value_lower):
+            'system' in value_lower or
+            '123456789' in value_lower):
         return None
 
     logging.debug(f"Clean tag: {value}")
