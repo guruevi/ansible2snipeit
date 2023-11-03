@@ -445,8 +445,6 @@ def clean_mac(mac_address: str) -> str | None:
     # 00:00:00:00:00:00 -> invalid
     # 0A:00:27:00:00:00 -> VirtualBox
     bad_prefix = ['00:00:00',
-                  # VirtualBox is always sequential starting from 1 so collissions happen frequently
-                  '0A:00:27',
                   # HyperV
                   # '00:15:5D',
                   # VMWare network adapters for Player
@@ -464,11 +462,15 @@ def clean_mac(mac_address: str) -> str | None:
                   '00:05:9A:3C:7A:00', '00:05:9A:3C:78:00',
                   # GlobalProtect
                   '02:50:41:00:00:01',
-                  # Apple USB dongles
+                  # Apple USB dongles?
                   '5C:F7:E6:8B',
-                  # Microsoft Loopback Adapter
-                  '02:00:4C:4F:4F:50'
+                  # Microsoft USB dongles?
+                  'F0:1D:BC:F2'
                   ]
+
+    # Random MAC addresses x2, x6, xA, xE
+    if mac_address[1] in ['2', '6', 'A', 'E']:
+        return None
 
     # :11 is /28
     if mac_address in bad_prefix or mac_address[:11] in bad_prefix or mac_address[:8] in bad_prefix:
