@@ -548,7 +548,8 @@ def clean_tag(value: Any) -> str | None:
                "empty",
                "varian",
                "unknown",
-               "dip-718s"]
+               "dip-718s",
+               "asset-1234567890"]
     if not value or len(str(value)) < 3 or str(value).lower() in invalid:
         return None
 
