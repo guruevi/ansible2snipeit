@@ -437,9 +437,10 @@ def clean_mac(mac_address: str) -> str | None:
 
     mac_address = mac_address.upper()
 
-    # bad_macs = []
-    # if mac_address in bad_macs:
-    #     return None
+    # Random MAC addresses x2, x6, xA, xE are reserved for local use
+    # This catches Microsoft Loopback, VirtualBox, GlobalProtect and Apple Private addresses
+    if mac_address[1] in ['2', '6', 'A', 'E']:
+        return None
 
     # Bad MAC addresses
     # 00:00:00:00:00:00 -> invalid
@@ -460,17 +461,13 @@ def clean_mac(mac_address: str) -> str | None:
                   'F4:4D:AD', '5C:85:7E:30', '70:88:6B:80',
                   # Cisco AnyConnect
                   '00:05:9A:3C:7A:00', '00:05:9A:3C:78:00',
-                  # GlobalProtect
-                  '02:50:41:00:00:01',
                   # Apple USB dongles?
                   '5C:F7:E6:8B',
                   # Microsoft USB dongles?
-                  'F0:1D:BC:F2'
+                  'F0:1D:BC:F2',
+                  # ASIX USB dongles?
+                  'F8:E4:3B:5B'
                   ]
-
-    # Random MAC addresses x2, x6, xA, xE
-    if mac_address[1] in ['2', '6', 'A', 'E']:
-        return None
 
     # :11 is /28
     if mac_address in bad_prefix or mac_address[:11] in bad_prefix or mac_address[:8] in bad_prefix:
