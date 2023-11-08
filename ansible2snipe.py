@@ -548,7 +548,8 @@ def clean_tag(value: Any) -> str | None:
                "empty",
                "varian",
                "unknown",
-               "dip-718s"]
+               "dip-718s",
+               "cbx3___"]
     value_lower = str(value).lower()
 
     if not value_lower or len(value_lower) < 3 or value_lower in invalid:

@@ -64,7 +64,8 @@ while offset <= total:
     serials = {}
     for asset in pages['rows']:
         serial = asset['serial'].lower()
-        if serial.startswith('sccm-') or serial.startswith('ordr-') or serial.startswith('ans-'):
+        if (asset['purchase_date'] or
+                serial.startswith('sccm-') or serial.startswith('ordr-') or serial.startswith('ans-')):
             continue
 
         shipDate = query_apple_warranty(asset['serial'], model_name=asset['model']['name'])
@@ -73,9 +74,6 @@ while offset <= total:
             continue
 
         date_string = shipDate.strftime('%Y-%m-%d')
-
-        if asset['purchase_date'] == date_string:
-            continue
 
         payload = {'purchase_date': date_string, 'warranty_months': 36}
         api_call(f"hardware/{asset['id']}", method='PATCH', payload=payload)
