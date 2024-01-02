@@ -45,9 +45,8 @@ if parameter in valid_params:
 while next_page:
     # Get the first page of results
     response = get(ordr_url + next_page, auth=auth, verify=ordr_tls_verify)
-    print(response.text)
+    logging.debug(response.text)
     data = response.json()
-    logging.debug(data)
 
     if 'MetaData' in data and 'next' in data['MetaData'] and data['MetaData']['next']:
         # Write next_page to disk in case we crash
@@ -55,7 +54,7 @@ while next_page:
         #     the_file.write(next_page)
         next_page = data['MetaData']['next']
     else:
-        # Delete last_page.txt
+        # Delete last_page.txt if we are at the end of our roll
         # try:
         #     os.remove('last_page.txt')
         # except FileNotFoundError:
@@ -76,7 +75,11 @@ while next_page:
             name = device['dhcpHostname'].split('.')[0].upper()
         else:
             name = device['deviceName'].split('.')[0].upper()
+
         macaddress = clean_mac(device['MacAddress'])
+        if not macaddress:
+            logging.warning(f"WARNING: Invalid MAC address found for {name}. Skipping.")
+            continue
 
         if 'MfgName' in device:
             manufacturer = clean_manufacturer(clean_tag(device['MfgName']))
@@ -127,7 +130,7 @@ while next_page:
         elif device['Group'] == "Gaming Devices":
             device_type = "gaming"
         else:
-            print(f"WARNING: Category {device['Group']} not found. Skipping.")
+            logging.error(f"WARNING: Category {device['Group']} not found. Skipping.")
             continue
 
         if macaddress:
@@ -138,14 +141,13 @@ while next_page:
         snipe_asset = get_snipe_asset(serial=serial, name=name, mac_addresses=[macaddress], asset_tag=asset_tag)
 
         if snipe_asset['total'] > 1:
-            logging.error(f"Multiple assets in Snipe-IT for {name}")
-            logging.debug(snipe_asset)
+            logging.error(f"Multiple assets in Snipe-IT for {name}, {serial}, {macaddress}, {asset_tag}")
             continue
 
         model_id = get_snipe_model_id(model, manufacturer, device_type)
         # Create a payload:
         if not serial:
-            print(f"WARNING: Serial number not found for {name}.")
+            logging.debug(f"WARNING: Serial number not found for {name}.")
             serial = asset_tag.replace("_", "")
 
         payload = {
