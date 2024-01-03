@@ -156,7 +156,7 @@ for entry in tree.findall('atom:entry', namespaces):
     # Get Details_Table0_Manufacturer
     manufacturer = clean_manufacturer(properties.find('d:Details_Table0_Manufacturer', namespaces).text)
     # Get Details_Table0_Model
-    model = properties.find('d:Details_Table0_Model', namespaces).text
+    model = clean_tag(properties.find('d:Details_Table0_Model', namespaces).text)
 
     memory = properties.find('d:Details_Table0_MemoryKBytes', namespaces).text or 0
     # Get Processor_Name
