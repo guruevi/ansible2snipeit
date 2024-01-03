@@ -468,7 +468,9 @@ def clean_mac(mac_address: str) -> str | None:
                   # ASIX USB dongles?
                   'F8:E4:3B:5B',
                   # BizLink (Kunshan) USB dongles
-                  '9C:EB:E8'
+                  '9C:EB:E8',
+                  # Speed Dragon Multimedia USB dongle
+                  '00:13:3B:A0:08:93'
                   ]
 
     # :11 is /28

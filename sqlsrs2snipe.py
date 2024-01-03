@@ -158,8 +158,7 @@ for entry in tree.findall('atom:entry', namespaces):
     # Get Details_Table0_Model
     model = properties.find('d:Details_Table0_Model', namespaces).text
 
-    memory = properties.find(
-        'd:Details_Table0_MemoryKBytes', namespaces).text
+    memory = properties.find('d:Details_Table0_MemoryKBytes', namespaces).text or 0
     # Get Processor_Name
     processor_name = properties.find('d:Processor_Name', namespaces).text
     # Get Details_Table0_DiskSpaceMB
