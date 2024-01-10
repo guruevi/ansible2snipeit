@@ -391,6 +391,30 @@ def get_os_config_value(os, config_key, data):
     return clean_tag(value)
 
 
+def validate_ip(ip):
+    # Validate this is an IPv4 address
+    try:
+        ip = ip.split(".")
+        if len(ip) != 4:
+            return None
+        for octet in ip:
+            octet = int(octet)
+            if octet < 1 or octet > 254:
+                return None
+    except ValueError:
+        return None
+
+    # Check if this is a bogus IP address
+    if int(ip[0]) in [127, 255]:
+        return None
+    if int(ip[0]) == 169 and int(ip[1]) == 254:
+        return None
+    if int(ip[0]) in range(224, 239):
+        return None
+
+    return ".".join(ip)
+
+
 # Function to recursively get keys from a dictionary
 def get_config_value(config_key, data, invalid_values=None):
     logging.debug(f"Getting config value for {config_key}")
@@ -431,11 +455,11 @@ def get_config_value(config_key, data, invalid_values=None):
 
 
 def clean_mac(mac_address: str) -> str | None:
+    # Remove everything that is not a hex character
+    mac_address = ''.join(c for c in mac_address.upper() if c in '0123456789ABCDEF')
     # Invalid MAC
-    if not mac_address or len(mac_address) != 17:
+    if not mac_address or len(mac_address) != 12:
         return None
-
-    mac_address = mac_address.upper()
 
     # Random MAC addresses x2, x6, xA, xE are reserved for local use
     # This catches Microsoft Loopback, VirtualBox, GlobalProtect and Apple Private addresses
@@ -445,37 +469,43 @@ def clean_mac(mac_address: str) -> str | None:
     # Bad MAC addresses
     # 00:00:00:00:00:00 -> invalid
     # 0A:00:27:00:00:00 -> VirtualBox
-    bad_prefix = ['00:00:00',
+    bad_prefix = ['000000',
                   # HyperV
-                  # '00:15:5D',
-                  # VMWare network adapters for Player
-                  '00:50:56:C0',
+                  '00:15:5D',
+                  # VMWare network adapters
+                  '005056',
                   # Belkin (USB network adapters)
-                  '00:17:3F', '00:1C:DF', '00:22:75', '08:86:3B', '14:91:82', '24:F5:A2', '30:23:03', '58:EF:68',
-                  '60:38:E0', '80:69:1A', '94:10:3E', '94:44:52', 'B4:75:0E', 'C0:56:27', 'C4:41:1E', 'D8:EC:5E',
-                  'E8:9F:80', 'EC:1A:59',
-                  '00:11:50', '00:30:BD',
+                  '00173F', '001CDF', '002275', '08863B', '149182', '24F5A2', '302303', '58EF68',
+                  '6038E0', '80691A', '94103E', '944452', 'B4750E', 'C05627', 'C4411E', 'D8EC5E',
+                  'E89F80', 'EC1A59',
+                  '001150', '0030BD',
                   # CE Link (USB network adapters)
-                  '6C:6E:07', '70:B3:D5:54', 'A0:CE:C8',
+                  '6C6E07', '70B3D554', 'A0CEC8',
                   # Cable Matters (USB network adapters)
-                  'F4:4D:AD', '5C:85:7E:30', '70:88:6B:80',
+                  'F44DAD', '5C857E30', '70886B80',
                   # Cisco AnyConnect
-                  '00:05:9A:3C:7A:00', '00:05:9A:3C:78:00',
+                  '00059A3C7A00', '00059A3C7800',
                   # Apple USB dongles?
-                  '5C:F7:E6:8B',
+                  '5CF7E68B',
                   # Microsoft USB dongles?
-                  'F0:1D:BC:F2',
+                  'F01DBCF2',
                   # ASIX USB dongles?
-                  'F8:E4:3B:5B',
+                  'F8E43B5B',
                   # BizLink (Kunshan) USB dongles
-                  '9C:EB:E8',
+                  '9CEBE8',
                   # Speed Dragon Multimedia USB dongle
-                  '00:13:3B:A0:08:93'
+                  '00133BA0',
+                  # AuKey (Kingtron) USB dongles
+                  '98FC84E'
                   ]
 
     # :11 is /28
-    if mac_address in bad_prefix or mac_address[:11] in bad_prefix or mac_address[:8] in bad_prefix:
+    if (mac_address in bad_prefix or
+            mac_address[:7] in bad_prefix or mac_address[:6] in bad_prefix or mac_address[:5] in bad_prefix):
         return None
+
+    # Add colons
+    mac_address = ':'.join(mac_address[i:i + 2] for i in range(0, 12, 2))
 
     return mac_address
 
@@ -878,7 +908,7 @@ def main():
             if not ansible_asset:
                 continue
             # If the entry doesn't contain a serial or asset id, then we need to skip this entry.
-            computer_name = ansible_asset['_id']
+            computer_name = str(ansible_asset['_id']).split('.')[0].upper()
             logging.debug(f"The asset we're working on is: {computer_name}")
 
             serial = get_os_config_value(os, 'serial', ansible_asset['data'])
@@ -887,14 +917,14 @@ def main():
             manufacturer = clean_manufacturer(get_os_config_value(os, 'manufacturer', ansible_asset['data']))
 
             if not asset_tag:
-                logging.debug(f"Asset tag not found for {ansible_asset['_id']}. Skipping.")
-                asset_tag = f"ans-{ansible_asset['_id']}"
+                logging.debug(f"Asset tag not found for {computer_name}. Skipping.")
+                asset_tag = f"ANS-{computer_name}"
 
             snipe_asset = get_snipe_asset(serial=serial, name=computer_name, asset_tag=asset_tag)
 
             if not serial:
-                logging.debug(f"Serial number not found for {ansible_asset['_id']}. Skipping.")
-                serial = f"ans-{ansible_asset['_id']}"
+                logging.debug(f"Serial number not found for {computer_name}. Skipping.")
+                serial = f"ANS-{computer_name}"
 
             logging.debug(f"Snipe returned: {snipe_asset}")
             if snipe_asset['total'] > 1:
@@ -902,7 +932,7 @@ def main():
                 continue
 
             if not model:
-                logging.info(f"Model not available for {ansible_asset['_id']}. Setting to Unknown.")
+                logging.info(f"Model not available for {computer_name}. Setting to Unknown.")
                 model = "Unknown"
                 # Manufacturer is a dependency of model, so if model is unknown, manufacturer is unknown
                 manufacturer = "Unknown"
@@ -911,7 +941,7 @@ def main():
 
             # Create a payload:
             payload = {
-                "name": ansible_asset['_id'],
+                "name": computer_name,
                 "serial": serial,
                 "status_id": default_status,
                 "category_id": default_category,
@@ -926,11 +956,11 @@ def main():
 
             asset = {}
             if not snipe_asset['total']:
-                logging.info(f"Creating a new asset in snipe for {ansible_asset['_id']}")
+                logging.info(f"Creating a new asset in snipe for {computer_name}")
                 logging.debug(f"Creating new asset with payload: {payload}")
                 asset = create_snipe_asset(payload)
             elif snipe_asset['total'] == 1:
-                logging.info(f"Existing asset in Snipe-IT for {ansible_asset['_id']}")
+                logging.info(f"Existing asset in Snipe-IT for {computer_name}")
                 asset = snipe_asset['rows'][0]
                 update_time = asset['updated_at']['datetime']
                 # Convert to datetime object
@@ -940,13 +970,13 @@ def main():
                     ansible_asset['date'] = datetime.strptime(ansible_asset['date'], '%Y-%m-%dT%H:%M:%S.%f%z')
                 # Compare update_time to ansible update time
                 if update_time >= ansible_asset['date'] and not USER_ARGS.force:
-                    logging.info(f"Skipping update for {ansible_asset['_id']} because the Snipe record is newer.")
+                    logging.info(f"Skipping update for {computer_name} because the Snipe record is newer.")
                     continue
 
-                if payload['serial'] == asset['serial'] or payload['serial'].startswith('ans-'):
+                if payload['serial'] == asset['serial'] or payload['serial'].startswith('ANS-'):
                     del payload['serial']
 
-                if payload['asset_tag'] == asset['asset_tag'] or payload['asset_tag'].startswith('ans-'):
+                if payload['asset_tag'] == asset['asset_tag'] or payload['asset_tag'].startswith('ANS-'):
                     del payload['asset_tag']
 
                 for key in asset:
@@ -967,7 +997,7 @@ def main():
                 if payload:
                     update_snipe_asset(asset['id'], payload)
 
-                logging.debug(f"Done updating {ansible_asset['_id']}")
+                logging.debug(f"Done updating {computer_name}")
 
             # Check if we need to check out the asset
             if USER_ARGS.users or USER_ARGS.users_force:

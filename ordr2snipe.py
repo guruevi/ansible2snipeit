@@ -134,9 +134,9 @@ while next_page:
             continue
 
         if macaddress:
-            asset_tag = "ordr-" + macaddress.replace(':', '_')
+            asset_tag = "ORDR-" + macaddress.replace(':', '_').upper()
         else:
-            asset_tag = "ordr-" + name
+            asset_tag = "ORDR-" + name.upper()
 
         snipe_asset = get_snipe_asset(serial=serial, name=name, mac_addresses=[macaddress], asset_tag=asset_tag)
 
@@ -199,8 +199,8 @@ while next_page:
             logging.info(f"Existing asset in Snipe-IT for {name}")
             asset = snipe_asset['rows'][0]
             if (payload['serial'] == asset['serial'] or
-                    payload['serial'].startswith('ordr-') or
-                    not asset['serial'].startswith('ordr-')):
+                    payload['serial'].startswith('ORDR-') or
+                    not asset['serial'].startswith('ORDR-')):
                 del payload['serial']
 
             # ORDR is less accurate on these things

@@ -9,7 +9,8 @@ import xml.etree.ElementTree as ElementTree
 import requests
 from requests_ntlm import HttpNtlmAuth
 from ansible2snipe import (get_snipe_model_id, get_snipe_asset, clean_tag, create_snipe_asset, update_snipe_asset,
-                           checkout_snipe_asset, USER_ARGS, CONFIG, clean_mac, clean_manufacturer, fill_macfields)
+                           checkout_snipe_asset, USER_ARGS, CONFIG, clean_mac, clean_manufacturer, fill_macfields,
+                           validate_ip)
 import xmltodict
 
 # Stat file
@@ -39,31 +40,6 @@ if not report_stat or (datetime.now().timestamp() - report_stat.st_mtime) > 8640
             f2.write(chunk)
     f2.close()
 
-
-def validate_ip(ip):
-    # Validate this is an IPv4 address
-    try:
-        ip = ip.split(".")
-        if len(ip) != 4:
-            return None
-        for octet in ip:
-            octet = int(octet)
-            if octet < 1 or octet > 254:
-                return None
-    except ValueError:
-        return None
-
-    # Check if this is a bogus IP address
-    if int(ip[0]) in [127, 255]:
-        return None
-    if int(ip[0]) == 169 and int(ip[1]) == 254:
-        return None
-    if int(ip[0]) in range(224, 239):
-        return None
-
-    return ".".join(ip)
-
-
 # Open XML file
 tree = ElementTree.parse("report.xml")
 with open('report2.xml') as fd:
@@ -87,7 +63,7 @@ def find_network_info(name) -> dict[str]:
 namespaces = {'m': 'http://schemas.microsoft.com/ado/2007/08/dataservices/metadata',
               'd': 'http://schemas.microsoft.com/ado/2007/08/dataservices',
               'atom': 'http://www.w3.org/2005/Atom'}
-starts_with = "CVMAPDCEPIC01"
+
 # For each entry tag
 for entry in tree.findall('atom:entry', namespaces):
     # Get the content tag
@@ -126,11 +102,11 @@ for entry in tree.findall('atom:entry', namespaces):
     # Get Details_Table0_SerialNumber
     serial_number = clean_tag(properties.find('d:Details_Table0_SerialNumber', namespaces).text)
     resourceid = properties.find('d:Details_Table0_ResourceID', namespaces).text
+
     # Get Details_Table0_ComputerName
-    computer_name = properties.find('d:Details_Table0_ComputerName', namespaces).text.upper()
-    if starts_with and computer_name != starts_with:
-        continue
-    starts_with = None
+    computer_name = properties.find('d:Details_Table0_ComputerName', namespaces).text
+    computer_name = computer_name.split('.')[0].upper()
+
     # Get Details_Table0_Domain
     domain = properties.find(
         'd:Details_Table0_DomainWorkgroup', namespaces).text
@@ -203,7 +179,7 @@ for entry in tree.findall('atom:entry', namespaces):
 
     if not asset_tag:
         logging.info(f"No asset tag for {computer_name}")
-        payload['asset_tag'] = f"sccm-{resourceid}"
+        payload['asset_tag'] = f"SCCM-{resourceid}"
 
     snipe_asset = get_snipe_asset(serial=serial_number,
                                   mac_addresses=mac_addresses,
@@ -212,7 +188,7 @@ for entry in tree.findall('atom:entry', namespaces):
 
     if not serial_number:
         logging.error(f"No serial number for {computer_name}")
-        payload['serial'] = f"sccm-{resourceid}"
+        payload['serial'] = f"SCCM-{resourceid}"
 
     if snipe_asset['total'] > 1:
         logging.error(f"Multiple assets found for {serial_number}")
