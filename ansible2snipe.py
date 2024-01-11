@@ -720,6 +720,8 @@ def clean_manufacturer(manufacturer):
         return 'Schneider Electric'
     elif manufacturer_lower.startswith('siemens'):
         return 'Siemens AG'
+    elif manufacturer_lower.startswith('samsung'):
+        return 'Samsung'
     elif manufacturer_lower.startswith('summit'):
         return 'Summit Data Communications'
     elif manufacturer_lower.startswith('sony'):
