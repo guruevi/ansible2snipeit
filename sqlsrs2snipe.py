@@ -168,6 +168,8 @@ for entry in tree.findall('atom:entry', namespaces):
         payload['_snipeit_storage_3'] = disk_space
     if processor_name:
         payload['_snipeit_cpu_name_14'] = processor_name
+    if top_console_user:
+        payload['_snipeit_console_user_39'] = top_console_user
 
     # Get network info
     mac_addresses = find_network_info(computer_name)
@@ -232,6 +234,8 @@ for entry in tree.findall('atom:entry', namespaces):
 
         # Update asset
         if payload:
+            print(asset['name'])
+            print(payload)
             asset = update_snipe_asset(asset_id, payload)
 
     if (USER_ARGS.users or USER_ARGS.users_force) and top_console_user:
