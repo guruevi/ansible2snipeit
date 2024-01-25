@@ -100,7 +100,7 @@ for entry in tree.findall('atom:entry', namespaces):
     # </content>
     # Get Details_Table0_ResourceID
     # Get Details_Table0_SerialNumber
-    serial_number = clean_tag(properties.find('d:Details_Table0_SerialNumber', namespaces).text)
+    serial_number = clean_tag(properties.find('d:Details_Table0_SerialNumber', namespaces).text.upper())
     resourceid = properties.find('d:Details_Table0_ResourceID', namespaces).text
 
     # Get Details_Table0_ComputerName
@@ -128,7 +128,7 @@ for entry in tree.findall('atom:entry', namespaces):
         'd:Details_Table0_ServicePackLevel', namespaces).text
 
     # Get Details_Table0_AssetTag
-    asset_tag = clean_tag(properties.find('d:Details_Table0_AssetTag', namespaces).text)
+    asset_tag = clean_tag(properties.find('d:Details_Table0_AssetTag', namespaces).text.upper())
     # Get Details_Table0_Manufacturer
     manufacturer = clean_manufacturer(properties.find('d:Details_Table0_Manufacturer', namespaces).text)
     # Get Details_Table0_Model
@@ -211,9 +211,9 @@ for entry in tree.findall('atom:entry', namespaces):
             logging.info(f"Skipping update for {asset['id']} because the Snipe record is newer.")
             continue
 
-        if asset['serial'] == payload['serial'] or payload['serial'].startswith('sccm'):
+        if asset['serial'] == payload['serial'] or payload['serial'].startswith('SCCM'):
             del payload['serial']
-        if asset['asset_tag'] == payload['asset_tag'] or payload['asset_tag'].startswith('sccm'):
+        if asset['asset_tag'] == payload['asset_tag'] or payload['asset_tag'].startswith('SCCM'):
             del payload['asset_tag']
         if asset['name'] == payload['name']:
             del payload['name']
