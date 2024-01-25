@@ -95,7 +95,7 @@ while next_page:
         vlanname = device['vlanName']
 
         if 'SerialNo' in device:
-            serial = clean_tag(device['SerialNo'])
+            serial = clean_tag(device['SerialNo'].upper())
         else:
             serial = None
 
