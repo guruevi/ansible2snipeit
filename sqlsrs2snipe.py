@@ -100,7 +100,7 @@ for entry in tree.findall('atom:entry', namespaces):
     # </content>
     # Get Details_Table0_ResourceID
     # Get Details_Table0_SerialNumber
-    serial_number = clean_tag(properties.find('d:Details_Table0_SerialNumber', namespaces).text.upper())
+    serial_number = clean_tag(properties.find('d:Details_Table0_SerialNumber', namespaces).text)
     resourceid = properties.find('d:Details_Table0_ResourceID', namespaces).text
 
     # Get Details_Table0_ComputerName
@@ -128,7 +128,7 @@ for entry in tree.findall('atom:entry', namespaces):
         'd:Details_Table0_ServicePackLevel', namespaces).text
 
     # Get Details_Table0_AssetTag
-    asset_tag = clean_tag(properties.find('d:Details_Table0_AssetTag', namespaces).text.upper())
+    asset_tag = clean_tag(properties.find('d:Details_Table0_AssetTag', namespaces).text)
     # Get Details_Table0_Manufacturer
     manufacturer = clean_manufacturer(properties.find('d:Details_Table0_Manufacturer', namespaces).text)
     # Get Details_Table0_Model
@@ -150,7 +150,9 @@ for entry in tree.findall('atom:entry', namespaces):
         asset_tag = ""
 
     model_id = get_snipe_model_id(model, manufacturer, "computer")
-    payload = {"name": computer_name, "serial": serial_number, "model_id": model_id, "asset_tag": asset_tag,
+    payload = {"name": computer_name,
+               "serial": str(serial_number).upper(),
+               "model_id": model_id, "asset_tag": str(asset_tag).upper(),
                "status_id": 2, "category_id": 2, '_snipeit_ram_2': round(int(memory) / 1024),
                '_snipeit_operating_system_8': operating_system}
 
