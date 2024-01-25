@@ -170,7 +170,7 @@ for entry in tree.findall('atom:entry', namespaces):
         payload['_snipeit_storage_3'] = disk_space
     if processor_name:
         payload['_snipeit_cpu_name_14'] = processor_name
-    if top_console_user:
+    if top_console_user and top_console_user != "Unknown":
         payload['_snipeit_console_user_39'] = top_console_user
 
     # Get network info
