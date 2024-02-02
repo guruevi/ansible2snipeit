@@ -147,11 +147,11 @@ def cache_snipe_search(search: str, search_type: str) -> list:
         return [CACHE[search_type][search]]
 
     # We search only the first 5 characters, that way we don't need to re-search for similar names
-    response = paginated_snipe_search(search.upper()[0:5])
+    response = paginated_snipe_search(search[0:5])
     cache_response(response)
 
-    if search.upper() in CACHE[search_type]:
-        return [CACHE[search_type][search.upper()]]
+    if search in CACHE[search_type]:
+        return [CACHE[search_type][search]]
 
     return []
 
@@ -336,9 +336,9 @@ def update_snipe_asset(old_asset, new_asset):
     if 'company_id' in new_asset and old_asset['company'] and old_asset['company']['id'] == new_asset['company_id']:
         del new_asset['company_id']
 
-    # Clean up regular fields
+    # Clean up regular fields, don't revert to empty fields
     for key, value in old_asset.items():
-        if key in new_asset and str(value) == str(new_asset[key]):
+        if not str(new_asset[key]) or (key in new_asset and str(value) == str(new_asset[key])):
             del new_asset[key]
 
     # Clean up custom fields
@@ -348,7 +348,7 @@ def update_snipe_asset(old_asset, new_asset):
         old_value_str = html.unescape(str(value['value'])).strip()
         new_value_str = str(new_asset[value['field']]).strip()
 
-        if old_value_str == new_value_str:
+        if not new_value_str or old_value_str == new_value_str:
             del new_asset[value['field']]
             continue
         # Sometimes versions are returned chopping off the last .0
