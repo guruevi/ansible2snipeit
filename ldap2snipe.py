@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+import ipaddress
+
 from ldap.controls import SimplePagedResultsControl
 
 import dns.resolver
@@ -28,8 +30,14 @@ def process_result(item):
                '_snipeit_ou_12': ou_text,
                '_snipeit_os_version_9': item['os_version'],
                '_snipeit_os_build_10': item['os_hotfix'] or item['os_servicepack'],
-               '_snipeit_ip_address_13': item['ipaddress']
                }
+
+    # Validate IP addresses
+    try:
+        payload['_snipeit_ip_address_13'] = str(ipaddress.ip_address(item['ipaddress']))
+    except (ValueError, KeyError):
+        print(f"Error: {payload['name']} has no correct IP address.")
+
     asset_tag = "LDAP-{}".format(item['cn'].upper())
     assets = get_snipe_asset(name=item['cn'].upper(), asset_tag=asset_tag)
     if assets['total'] == 0:

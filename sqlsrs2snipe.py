@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Open XML file
 import html
+import ipaddress
 from datetime import datetime
 import logging
 import os
@@ -178,7 +179,12 @@ for entry in tree.findall('atom:entry', namespaces):
     mac_addresses = find_network_info(computer_name)
     if mac_addresses:
         mac_address = next(iter(mac_addresses))
-        payload["_snipeit_ip_address_13"] = next(iter(mac_addresses.values()))
+        ip_address = next(iter(mac_addresses.values()))
+        # Validate IP addresses
+        try:
+            payload['_snipeit_ip_address_13'] = str(ipaddress.ip_address(ip_address))
+        except ValueError:
+            print(f"Error: {ip_address} is not a correct IP address.")
     else:
         mac_address = None
 

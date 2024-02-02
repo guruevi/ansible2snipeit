@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # This will get a list of systems from ORDR and put them into Snipe-IT as "need-to-audit" assets.
-
+import ipaddress
 import os
 
 from requests import get
@@ -159,8 +159,10 @@ while next_page:
             "_snipeit_vlan_name_18": vlanname
         }
 
-        if 'IpAddress' in device:
-            payload["_snipeit_ip_address_13"] = device['IpAddress']
+        try:
+            payload['_snipeit_ip_address_13'] = str(ipaddress.ip_address(device['IpAddress']))
+        except (ValueError, KeyError):
+            print(f"Error: {name} no correct IP address.")
 
         if 'nwEquipHostname' in device:
             payload["_snipeit_switch_15"] = device['nwEquipHostname']
