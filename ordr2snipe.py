@@ -182,18 +182,18 @@ while next_page:
             payload['_snipeit_domain_11'] = domain
             payload['_snipeit_ou_12'] = ou
 
-        if 'OsType' in device and device['OsType']:
-            payload['_snipeit_operating_system_8'] = clean_os(device['OsType'])
-        if 'OsVersion' in device and device['OsVersion']:
-            os_version = device['OsVersion']
-            payload['_snipeit_os_version_9'] = os_version
-
         asset = {}
         payload = fill_macfields(snipe_asset, payload, [macaddress])
 
         if snipe_asset['total'] == 0:
             logging.info(f"Creating a new asset in snipe for {name}")
             logging.debug(payload)
+
+            if 'OsType' in device and device['OsType']:
+                payload['_snipeit_operating_system_8'] = clean_os(device['OsType'])
+            if 'OsVersion' in device and device['OsVersion']:
+                os_version = device['OsVersion']
+                payload['_snipeit_os_version_9'] = os_version
             asset = create_snipe_asset(payload)
         elif snipe_asset['total'] == 1:
             logging.info(f"Existing asset in Snipe-IT for {name}")
@@ -207,11 +207,11 @@ while next_page:
             del payload['status_id']
             del payload['category_id']
 
-            if asset['custom_fields']['Operating System']['value']:
-                del payload['_snipeit_operating_system_8']
+            if not asset['custom_fields']['Operating System']['value'] and 'OsType' in device and device['OsType']:
+                payload['_snipeit_operating_system_8'] = clean_os(device['OsType'])
 
-            if asset['custom_fields']['OS Version']['value']:
-                del payload['_snipeit_os_version_9']
+            if not asset['custom_fields']['OS Version']['value'] and 'OsVersion' in device and device['OsVersion']:
+                payload['_snipeit_os_version_9'] = device['OsVersion']
 
             if asset['custom_fields']['OU']['value']:
                 del payload['_snipeit_ou_12']
