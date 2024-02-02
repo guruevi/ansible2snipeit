@@ -212,10 +212,10 @@ while next_page:
             if not asset['custom_fields']['OS Version']['value'] and 'OsVersion' in device and device['OsVersion']:
                 payload['_snipeit_os_version_9'] = device['OsVersion']
 
-            if asset['custom_fields']['OU']['value']:
+            if 'ou' in device and asset['custom_fields']['OU']['value']:
                 del payload['_snipeit_ou_12']
 
-            if asset['custom_fields']['Domain']['value']:
+            if 'ou' in device and asset['custom_fields']['Domain']['value']:
                 del payload['_snipeit_domain_11']
 
             if payload['model_id'] == 11 or asset['model']['id'] != 11:
