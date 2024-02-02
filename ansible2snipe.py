@@ -400,6 +400,10 @@ def checkout_snipe_asset(username, asset):
         logging.debug("No username, not checking out asset")
         return False
 
+    if not asset:
+        logging.debug("No asset, not checking out asset")
+        return False
+
     username = username.lower()
     # Remove domain if it exists
     if '\\' in username:
