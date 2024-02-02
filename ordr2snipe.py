@@ -44,7 +44,7 @@ if parameter in valid_params:
 while next_page:
     # Get the first page of results
     response = get(ordr_url + next_page, auth=auth, verify=ordr_tls_verify)
-    logging.debug(response.text)
+    # logging.debug(response.text)
     data = response.json()
 
     if 'MetaData' in data and 'next' in data['MetaData'] and data['MetaData']['next']:
@@ -67,7 +67,7 @@ while next_page:
 
     for device in data['Devices']:
         logging.info(f"Processing {device['deviceName']}")
-        logging.debug(device)
+        # logging.debug(device)
 
         # DHCP hostname is reported by the device, deviceName is reported by the DNS server
         if 'dhcpHostname' in device:
@@ -134,7 +134,7 @@ while next_page:
 
         snipe_asset = get_snipe_asset(serial=serial, name=name, mac_addresses=[macaddress])
 
-        logging.debug(snipe_asset)
+        # logging.debug(snipe_asset)
         if snipe_asset['total'] > 1:
             logging.error(f"Multiple assets in Snipe-IT for {name}, {serial}, {macaddress}")
             continue
@@ -184,7 +184,7 @@ while next_page:
 
         if snipe_asset['total'] == 0:
             logging.info(f"Creating a new asset in snipe for {name}")
-            logging.debug(payload)
+            # logging.debug(payload)
             if macaddress:
                 payload['asset_tag'] = "ORDR-" + macaddress.replace(':', '_').upper()
             else:

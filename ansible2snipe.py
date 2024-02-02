@@ -125,7 +125,7 @@ def paginated_snipe_search(search, page=0):
     if response['total'] > payload['limit'] + payload['offset']:
         response['rows'].extend(paginated_snipe_search(search, page + 1)['rows'])
 
-    logging.debug(response)
+    # logging.debug(response)
     return response
 
 
@@ -325,12 +325,7 @@ def create_snipe_asset(payload):
 
 
 # Function that updates a snipe asset with a JSON payload
-def update_snipe_asset(old_asset, raw_asset):
-    new_asset = {}
-    for k, v in raw_asset.items():
-        if v:
-            new_asset[k] = v
-
+def update_snipe_asset(old_asset, new_asset):
     if 'serial_number' in new_asset and old_asset['serial'] == new_asset['serial_number']:
         del new_asset['serial_number']
 
@@ -365,6 +360,11 @@ def update_snipe_asset(old_asset, raw_asset):
         # Sometimes versions are returned chopping off the last .0
         if new_value_str + ".0" == old_value_str or new_value_str == old_value_str + ".0":
             del new_asset[value['field']]
+
+    payload = {}
+    for k, v in new_asset.items():
+        if v and str(v).lower() not in ["none", "null", "", "0", "unknown"]:
+            payload[k] = v
 
     if new_asset:
         response = snipe_api_call(f"hardware/{old_asset['id']}", payload=new_asset, method="PATCH")
@@ -521,13 +521,13 @@ def validate_ip(ip):
 # Function to recursively get keys from a dictionary
 def get_config_value(config_key, data, invalid_values=None):
     logging.debug(f"Getting config value for {config_key}")
-    logging.debug(f"Data: {data}")
+    # logging.debug(f"Data: {data}")
     split_key = config_key.split("|", 1)
     search_keys = split_key[0].strip().split(" ")
     j2_str = None
     if len(split_key) > 1:
         j2_str = split_key[1].strip()
-        logging.debug(f"Jinja2 template: {j2_str}")
+        # logging.debug(f"Jinja2 template: {j2_str}")
 
     value = data
     for key in search_keys:
@@ -701,7 +701,7 @@ def clean_tag(value: Any) -> str | None:
             '123456789' in value_lower):
         return None
 
-    logging.debug(f"Clean tag: {value}")
+    # logging.debug(f"Clean tag: {value}")
     return str(value)
 
 
