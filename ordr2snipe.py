@@ -204,9 +204,23 @@ while next_page:
             # ORDR is less accurate on these things
             del payload['name']
             del payload['asset_tag']
-            del payload['model_id']
             del payload['status_id']
             del payload['category_id']
+
+            if asset['custom_fields']['Operating System']['value']:
+                del payload['_snipeit_operating_system_8']
+
+            if asset['custom_fields']['OS Version']['value']:
+                del payload['_snipeit_os_version_9']
+
+            if asset['custom_fields']['OU']['value']:
+                del payload['_snipeit_ou_12']
+
+            if asset['custom_fields']['Domain']['value']:
+                del payload['_snipeit_domain_11']
+
+            if payload['model_id'] == 11 or asset['model']['id'] != 11:
+                del payload['model_id']
 
             if payload:
                 ret = update_snipe_asset(asset, payload)
