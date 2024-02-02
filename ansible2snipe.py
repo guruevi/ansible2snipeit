@@ -325,7 +325,12 @@ def create_snipe_asset(payload):
 
 
 # Function that updates a snipe asset with a JSON payload
-def update_snipe_asset(old_asset, new_asset):
+def update_snipe_asset(old_asset, raw_asset):
+    new_asset = {}
+    for k, v in raw_asset.items():
+        if v:
+            new_asset[k] = v
+
     if 'serial_number' in new_asset and old_asset['serial'] == new_asset['serial_number']:
         del new_asset['serial_number']
 
@@ -344,7 +349,7 @@ def update_snipe_asset(old_asset, new_asset):
 
     # Clean up regular fields, don't revert to empty fields
     for key, value in old_asset.items():
-        if key in new_asset and (not new_asset[key] or str(value) == str(new_asset[key])):
+        if key in new_asset and str(value) == str(new_asset[key]):
             del new_asset[key]
 
     # Clean up custom fields
@@ -352,9 +357,9 @@ def update_snipe_asset(old_asset, new_asset):
         if value['field'] not in new_asset:
             continue
         old_value_str = html.unescape(str(value['value'])).strip()
-        new_value_str = str(new_asset[value['field']]).strip()
+        new_value_str = str(new_asset[value['field']])
 
-        if not new_value_str or old_value_str == new_value_str:
+        if old_value_str == str(new_value_str).strip():
             del new_asset[value['field']]
             continue
         # Sometimes versions are returned chopping off the last .0
