@@ -114,12 +114,12 @@ for file in os.listdir(f'{INPUT_DIR}'):
                         payload = fill_macfields(snipe_asset, payload, macaddresses)
                     if operating_system:
                         payload["_snipeit_operating_system_8"] = operating_system
-                    # Check if status is set to "Unmanaged (Research)"
+                    # Set any "Pending" to "Unmanaged (Research)"
                     if snipe_asset['rows'][0]['status_label']['id'] == 1:
                         payload['status_id'] = 4
 
                     payload['notes'] = f"Imported from {file}. {owner} is the owner."
-                    update_snipe_asset(snipe_asset['rows'][0]['id'], payload)
+                    update_snipe_asset(snipe_asset['rows'][0], payload)
                     continue
 
                 # If we have no assets, create one

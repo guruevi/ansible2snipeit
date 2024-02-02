@@ -5,7 +5,7 @@ from dell_api.__main__ import DellApi
 
 dell_api = DellApi()
 
-from ansible2snipe import api_call
+from ansible2snipe import snipe_api_call
 
 dell_manufacturer_id = 2
 offset = 0
@@ -14,7 +14,7 @@ total = 0
 page = f'hardware?limit={limit}&manufacturer_id={dell_manufacturer_id}'
 
 while offset <= total:
-    pages = api_call(f'{page}&offset={offset}', method='GET')
+    pages = snipe_api_call(f'{page}&offset={offset}', method='GET')
     offset += limit
 
     total = pages['total']
@@ -71,4 +71,4 @@ while offset <= total:
                 payload['warranty_months'] = warranty_months
 
         if payload:
-            api_call(f"hardware/{serials[warranty['serviceTag']]}", method='PATCH', payload=payload)
+            snipe_api_call(f"hardware/{serials[warranty['serviceTag']]}", method='PATCH', payload=payload)

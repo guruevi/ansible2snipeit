@@ -10,7 +10,7 @@ import requests
 from requests_ntlm import HttpNtlmAuth
 from ansible2snipe import (get_snipe_model_id, get_snipe_asset, clean_tag, create_snipe_asset, update_snipe_asset,
                            checkout_snipe_asset, USER_ARGS, CONFIG, clean_mac, clean_manufacturer, fill_macfields,
-                           validate_ip)
+                           validate_ip, get_cache_stats)
 import xmltodict
 
 # Stat file
@@ -154,7 +154,8 @@ for entry in tree.findall('atom:entry', namespaces):
                "serial": str(serial_number).upper(),
                "model_id": model_id, "asset_tag": str(asset_tag).upper(),
                "status_id": 2, "category_id": 2, '_snipeit_ram_2': round(int(memory) / 1024),
-               '_snipeit_operating_system_8': operating_system}
+               '_snipeit_operating_system_8': operating_system,
+               "_snipeit_management_40": "SCCM"}
 
     # Custom fields
     if service_pack_level:
@@ -194,10 +195,6 @@ for entry in tree.findall('atom:entry', namespaces):
         logging.error(f"No serial number for {computer_name}")
         payload['serial'] = f"SCCM-{resourceid}"
 
-    if snipe_asset['total'] > 1:
-        logging.error(f"Multiple assets found for {serial_number}")
-        continue
-
     payload = fill_macfields(snipe_asset, payload, list(mac_addresses.keys()))
 
     if not snipe_asset['total']:
@@ -213,32 +210,18 @@ for entry in tree.findall('atom:entry', namespaces):
             logging.info(f"Skipping update for {asset['id']} because the Snipe record is newer.")
             continue
 
-        if asset['serial'] == payload['serial'] or payload['serial'].startswith('SCCM'):
+        if payload['serial'].startswith('SCCM'):
             del payload['serial']
-        if asset['asset_tag'] == payload['asset_tag'] or payload['asset_tag'].startswith('SCCM'):
+        if payload['asset_tag'].startswith('SCCM'):
             del payload['asset_tag']
-        if asset['name'] == payload['name']:
-            del payload['name']
-        if asset['model']['id'] == payload['model_id']:
-            del payload['model_id']
-        if asset['status_label']['id'] == payload['status_id']:
-            del payload['status_id']
-        if asset['category']['id'] == payload['category_id']:
-            del payload['category_id']
-
-        if asset['custom_fields']['IP Address']['field'] in payload and asset['custom_fields']['IP Address']['value']:
-            del payload[asset['custom_fields']['IP Address']['field']]
-
-        for key, value in asset['custom_fields'].items():
-            if (value['field'] in payload and
-                    str(payload[value['field']]).strip() == html.unescape(str(value['value'])).strip()):
-                del payload[value['field']]
 
         # Update asset
-        if payload:
-            print(asset['name'])
-            print(payload)
-            asset = update_snipe_asset(asset_id, payload)
+        asset = update_snipe_asset(asset, payload)
+    else:
+        logging.error(f"Multiple assets found for {computer_name}")
+        continue
 
     if (USER_ARGS.users or USER_ARGS.users_force) and top_console_user:
         checkout_snipe_asset(top_console_user, asset)
+
+logging.info(get_cache_stats())

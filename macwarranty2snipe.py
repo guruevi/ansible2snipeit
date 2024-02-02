@@ -2,7 +2,7 @@
 import re
 import datetime
 
-from ansible2snipe import api_call
+from ansible2snipe import snipe_api_call
 
 YEAR_REGEXP = re.compile(r'\d{4}')
 
@@ -57,7 +57,7 @@ total = 0
 page = f'hardware?limit={limit}&manufacturer_id={apple_manufacturer_id}'
 
 while offset <= total:
-    pages = api_call(f'{page}&offset={offset}', method='GET')
+    pages = snipe_api_call(f'{page}&offset={offset}', method='GET')
     offset += limit
 
     total = pages['total']
@@ -76,4 +76,4 @@ while offset <= total:
         date_string = shipDate.strftime('%Y-%m-%d')
 
         payload = {'purchase_date': date_string, 'warranty_months': 36}
-        api_call(f"hardware/{asset['id']}", method='PATCH', payload=payload)
+        snipe_api_call(f"hardware/{asset['id']}", method='PATCH', payload=payload)

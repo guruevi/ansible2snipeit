@@ -30,10 +30,12 @@
 #
 import html
 from functools import lru_cache
+from time import sleep
 from typing import Any, Iterable
 
 from pymongo import MongoClient
 import requests
+from requests import Response
 from configparser import RawConfigParser
 from argparse import ArgumentParser
 import logging
@@ -45,7 +47,6 @@ version = "0.1"
 MODELNUMBERS = {}
 MANUFACTURERS = {}
 DB: Any = None
-SNIPE_RATE_LIMIT = 1000
 CONFIG = {}
 
 
@@ -70,114 +71,165 @@ def search_ansible_name(name):
     return do_mongo_query({"data.ansible_hostname": name})
 
 
-# Function to look up a snipe asset by serial number.
-def get_snipe_asset(serial="", name="", mac_addresses=None, asset_tag="") -> dict:
-    if not mac_addresses:
-        mac_addresses = []
-    response = {'total': 0}
-    serial = clean_tag(serial)
-    name = clean_tag(name)
-    asset_tag = clean_tag(asset_tag)
-
-    clean_macaddresses = []
-    for mac_address in mac_addresses:
-        mac_address = clean_mac(mac_address)
-        if not mac_address:
-            continue
-        clean_macaddresses.append(mac_address)
-
-    # If we have a valid serial number always use that to uniquely identify the asset
-    if serial:
-        api_url = f'hardware/byserial/{serial}'
-        response = api_call(api_url)
-        if 'total' in response and response['total']:
-            return response
-
-    # Asset tags are less precise but always return 1 result
+def get_snipe_asset(serial="", name="", mac_addresses=None, asset_tag=None) -> dict:
+    # Asset tags always return 1 result
     if asset_tag:
-        api_url = f'hardware/bytag/{asset_tag}'
-        response = api_call(api_url)
+        if asset_tag in CACHE["ASSET_TAG"]:
+            CACHE['hits'] = CACHE['hits'] + 1
+            return {'rows': [CACHE["ASSET_TAG"][asset_tag]], 'total': 1}
+
+        response = snipe_api_call(f'hardware/bytag/{asset_tag}')
         if 'id' in response:
+            cache_response({'rows': [response]})
             return {'rows': [response], 'total': 1}
 
-    # MAC addresses *should* be unique but not always
-    found = {}
-    for mac_address in clean_macaddresses:
-        payload = {
-            'search': mac_address,
-            'limit': 500
-        }
-        response = api_call("hardware", method="GET", payload=payload)
-        if 'rows' in response:
-            for row in response['rows']:
-                for field_name, field in row['custom_fields'].items():
-                    if field['field_format'] == 'MAC' and field['value'].upper() == mac_address.upper():
-                        found[row['id']] = row
-                        break
+    found = []
+    # If we have a valid serial number use that to uniquely identify the asset
+    if serial:
+        found = cache_snipe_search(serial, "SERIAL")
+
+    if mac_addresses:
+        # MAC addresses *should* be unique
+        for mac_address in mac_addresses:
+            if found:
+                break
+            found = cache_snipe_search(mac_address, "MAC")
 
     # If we have a name, we can search for that
-    if len(found) == 0 and name and len(name) > 4:
-        payload = {
-            'search': name,
-            'limit': 500
-        }
-        response = api_call("hardware", method="GET", payload=payload)
-
-        if 'rows' in response:
-            # Search is fuzzy
-            for row in response['rows']:
-                if html.unescape(row['name'].upper()) == name.upper():
-                    found[row['id']] = row
+    if not found:
+        found = cache_snipe_search(name, "NAME")
 
     # Make a list from the found dict
-    response['rows'] = list(found.values())
-    response['total'] = len(found)
+    return {'rows': found, 'total': len(found)}
 
+
+CACHE = {"MAC": {}, "NAME": {}, "SERIAL": {}, "ASSET_TAG": {}, 'hits': 0}
+
+
+def paginated_snipe_search(search, page=0):
+    page_size = 500
+    payload = {
+        'search': search,
+        'limit': page_size,
+        'offset': page * page_size
+    }
+    logging.debug(f"Searching for {payload}")
+
+    response = snipe_api_call("hardware", method="GET", payload=payload)
+
+    if 'total' not in response or 'rows' not in response or not response['rows']:
+        return {'rows': [], 'total': 0}
+
+    if response['total'] > payload['limit'] + payload['offset']:
+        response['rows'].extend(paginated_snipe_search(search, page + 1)['rows'])
+
+    logging.debug(response)
     return response
 
 
-def api_call(endpoint, payload=None, method="GET"):
-    global CONFIG, USER_ARGS
-    # Headers for the API call.
-    snipe_headers = {'Authorization': f"Bearer {CONFIG['snipe-it']['apikey']}",
-                     'Accept': 'application/json',
-                     'Content-Type': 'application/json'}
-    logging.debug(f"Calling {endpoint} with method {method} and payload {payload}")
+def cache_response(response):
+    for row in response['rows']:
+        for field_name, field in row['custom_fields'].items():
+            if field['field_format'] == 'MAC':
+                CACHE["MAC"][field['value'].upper()] = row
+
+        CACHE["NAME"][html.unescape(row['name']).upper()] = row
+        CACHE["SERIAL"][row['serial'].upper()] = row
+        CACHE["ASSET_TAG"][row['asset_tag'].upper()] = row
+
+
+def cache_snipe_search(search, search_type):
+    search = search.upper()
+    if search in CACHE[search_type]:
+        CACHE['hits'] = CACHE['hits'] + 1
+        return CACHE[search_type][search]
+
+    # We search only the first 5 characters, that way we don't need to re-search for similar names
+    response = paginated_snipe_search(search.upper()[0:5])
+    cache_response(response)
+
+    if search.upper() in CACHE[search_type]:
+        return CACHE[search_type][search.upper()]
+
+    return []
+
+
+def get_cache_stats():
+    return (f"Cache hits: {CACHE['hits']}\n"
+            f"Cache size:\n"
+            f"{len(CACHE['MAC'])} MACs\n"
+            f"{len(CACHE['NAME'])} names\n"
+            f"{len(CACHE['SERIAL'])} serials\n"
+            f"{len(CACHE['ASSET_TAG'])} asset tags\n")
+
+
+def snipe_api_call(endpoint, payload=None, method="GET"):
+    global CONFIG, SNIPE_HEADERS, SNIPE_BACKOFF
+
     api_url = f"{CONFIG['snipe-it']['url']}/api/v1/{endpoint}"
+
+    # Snipe-IT API does not understand JSON with GET requests
+    if method == "GET" and payload:
+        api_url += "?"
+        for key, value in payload.items():
+            api_url += f"{key}={value}&"
+        api_url = api_url[:-1]
+        payload = None
+
+    response = api_call(api_url, payload, method, SNIPE_HEADERS)
+
+    if response.status_code == 200:
+        if SNIPE_BACKOFF:
+            SNIPE_BACKOFF -= 1
+        # DEV: This is a lot of output
+        # logging.debug(f"Got a valid response from Snipe-IT: {response.text}")
+        return response.json()
+
+    if response.status_code == 429:
+        SNIPE_BACKOFF += 1
+        backoff = SNIPE_BACKOFF * 30
+        logging.warning(f'Snipe-IT ratelimit exceeded: pausing {backoff}s')
+        sleep(backoff)
+        logging.info("Finished waiting. Retrying lookup...")
+        return snipe_api_call(endpoint, payload, method)
+
+    logging.error(f"Snipe-IT responded with error code:{response.text}")
+    logging.debug(f"{response.status_code} - {response.content}")
+    raise SystemExit("Snipe-IT API call failed")
+
+
+# Helper function to call an API
+def api_call(api_url, json=None, method="GET", headers=None, auth=None) -> Response:
+    logging.debug(f"Calling {api_url} with method {method} and payload {json}")
+
     if method == "GET":
-        logging.debug(f"Calling: {api_url}")
-        response = requests.get(api_url, headers=snipe_headers, json=payload, verify=USER_ARGS.do_not_verify_ssl)
+        response = requests.get(api_url, headers=headers, json=json, verify=USER_ARGS.do_not_verify_ssl)
     elif method == "POST":
-        response = requests.post(api_url, headers=snipe_headers, json=payload, verify=USER_ARGS.do_not_verify_ssl)
+        response = requests.post(api_url, auth=auth, headers=headers, json=json, verify=USER_ARGS.do_not_verify_ssl)
     elif method == "PATCH":
-        response = requests.patch(api_url, headers=snipe_headers, json=payload, verify=USER_ARGS.do_not_verify_ssl)
+        response = requests.patch(api_url, headers=headers, json=json, verify=USER_ARGS.do_not_verify_ssl)
     else:
         logging.error(f"Unknown method {method}")
         raise SystemExit("Unknown method")
 
-    if response.status_code != 200:
-        logging.error(f"Snipe-IT responded with error code:{response.text}")
-        logging.debug(f"{response.status_code} - {response.content}")
-        raise SystemExit("Snipe-IT API call failed")
-    logging.debug(f"Got a valid response from Snipe-IT: {response.text}")
-    return response.json()
+    return response
 
 
 # Function to get all the asset models
-@lru_cache(maxsize=None)
 def get_snipe_models(page=0):
     page_size = 500
-    limits = {
+    payload = {
         'limit': page_size,
         'offset': page * page_size
     }
     models = {}
-    response = api_call("models", payload=limits, method="GET")
+    response = snipe_api_call("models", payload=payload, method="GET")
 
     # This happens if there is an error
     if "total" not in response:
         logging.error("Fetching models failed, enable debug to see response")
         raise SystemExit("Necessary Snipe-IT API call failed")
+    logging.debug(f"Fetching models, {payload['offset']}+{payload['limit']}/{response['total']}")
 
     # Quickly end if there are no rows
     if "rows" not in response:
@@ -189,8 +241,7 @@ def get_snipe_models(page=0):
         models[row['name']] = row['id']
 
     # If we haven't gotten all the models, get more
-    if response['total'] >= limits['offset']:
-        logging.debug(f"Fetching more models, currently at: {limits['offset']}/{response['total']}")
+    if response['total'] > payload['limit'] + payload['offset']:
         models.update(get_snipe_models(page + 1))
 
     return models
@@ -231,8 +282,8 @@ def get_snipe_user_id(username):
     if not username:
         return None
 
-    payload = {"username": username, "all": True}
-    response = api_call(f"users", payload=payload, method="GET")
+    payload = {"username": username.lower(), "all": True}
+    response = snipe_api_call(f"users", payload=payload, method="GET")
 
     if 'total' not in response or response['total'] == 0:
         logging.debug(f"Got a valid response but no users")
@@ -248,7 +299,7 @@ def get_snipe_user_id(username):
 # Function that creates a new Snipe Model - not an asset - with a JSON payload
 def create_snipe_model(payload):
     global MODELNUMBERS
-    response = api_call("models", payload, method="POST")
+    response = snipe_api_call("models", payload, method="POST")
     MODELNUMBERS[response['payload']['model_number']] = int(response['payload']['id'])
 
     return MODELNUMBERS[response['payload']['model_number']]
@@ -256,7 +307,7 @@ def create_snipe_model(payload):
 
 # Function to create a new asset by passing array
 def create_snipe_asset(payload):
-    response = api_call("hardware", payload, method="POST")
+    response = snipe_api_call("hardware", payload, method="POST")
     if response['status'] == "error":
         logging.error(f"Asset creation failed for asset {payload['name']} with error {response['messages']}")
         logging.error(f"{payload}")
@@ -266,13 +317,52 @@ def create_snipe_asset(payload):
 
 
 # Function that updates a snipe asset with a JSON payload
-def update_snipe_asset(snipe_id, payload):
-    response = api_call(f'hardware/{snipe_id}', payload=payload, method="PATCH")
-    if response['status'] == "error":
-        logging.error(f"Asset update failed for asset {snipe_id} with error {response['messages']}")
-        raise SystemExit("Asset update failed")
+def update_snipe_asset(old_asset, new_asset):
+    if 'serial_number' in new_asset and old_asset['serial'] == new_asset['serial_number']:
+        del new_asset['serial_number']
 
-    return response['payload']
+    if ('status_id' in new_asset and old_asset['status_label'] and
+            old_asset['status_label']['id'] == new_asset['status_id']):
+        del new_asset['status_id']
+
+    if 'model_id' in new_asset and old_asset['model'] and old_asset['model']['id'] == new_asset['model_id']:
+        del new_asset['model_id']
+
+    if 'category_id' in new_asset and old_asset['category'] and old_asset['category']['id'] == new_asset['category_id']:
+        del new_asset['category_id']
+
+    if 'company_id' in new_asset and old_asset['company'] and old_asset['company']['id'] == new_asset['company_id']:
+        del new_asset['company_id']
+
+    # Clean up regular fields
+    for key, value in old_asset.items():
+        if key in new_asset and str(value) == str(new_asset[key]):
+            del new_asset[key]
+
+    # Clean up custom fields
+    for key, value in old_asset['custom_fields'].items():
+        if value['field'] not in new_asset:
+            continue
+        old_value_str = html.unescape(str(value['value'])).strip()
+        new_value_str = str(new_asset[value['field']]).strip()
+
+        if old_value_str == new_value_str:
+            del new_asset[value['field']]
+            continue
+        # Sometimes versions are returned chopping off the last .0
+        if new_value_str + ".0" == old_value_str or new_value_str == old_value_str + ".0":
+            del new_asset[value['field']]
+
+    if new_asset:
+        response = snipe_api_call(f"hardware/{old_asset['id']}", payload=new_asset, method="PATCH")
+
+        if "payload" not in response or not response['payload']:
+            logging.error(f"Unable to update asset: {old_asset['id']}. Received {response}")
+            return None
+
+        return response['payload']
+
+    return old_asset
 
 
 # Function that checks in an asset in snipe
@@ -280,7 +370,7 @@ def checkin_snipe_asset(asset_id):
     payload = {"note": "checked in by script from Ansible",
                "status_id": 2
                }
-    return api_call(f'hardware/{asset_id}/checkin', method="POST", payload=payload)
+    return snipe_api_call(f'hardware/{asset_id}/checkin', method="POST", payload=payload)
 
 
 def get_snipe_technicians():
@@ -335,25 +425,25 @@ def checkout_snipe_asset(username, asset):
         "status_id": 2,
         "assigned_user": user_id
     }
-    response = api_call(f'hardware/{asset["id"]}/checkout', payload=payload, method="POST")
+    response = snipe_api_call(f'hardware/{asset["id"]}/checkout', payload=payload, method="POST")
 
     return response
 
 
-def get_snipe_manufacturers():
+def get_snipe_manufacturers(page=0):
     global MANUFACTURERS
     payload = {
         'limit': 500,
-        'offset': len(MANUFACTURERS)
+        'offset': page * 500
     }
-    response = api_call("manufacturers", method="GET", payload=payload)
+    response = snipe_api_call("manufacturers", method="GET", payload=payload)
 
     for manufacturer in response['rows']:
         MANUFACTURERS[manufacturer['name']] = int(manufacturer['id'])
 
-    if response['total'] > len(MANUFACTURERS):
+    if response['total'] > payload['limit'] + payload['offset']:
         logging.debug(f"Total manufacturers is {response['total']} and we have {len(MANUFACTURERS)}")
-        return get_snipe_manufacturers()
+        return get_snipe_manufacturers(page + 1)
 
     return MANUFACTURERS
 
@@ -373,7 +463,7 @@ def get_manufacturer(name: str) -> int:
 
     logging.info(f"Creating manufacturer {name}")
     payload = {"name": name}
-    response = api_call("manufacturers", payload=payload, method="POST")
+    response = snipe_api_call("manufacturers", payload=payload, method="POST")
 
     # If we do not have payload, but status 200, that means something went wrong
     if 'payload' not in response or not response['payload']:
@@ -786,10 +876,6 @@ runtime_args.add_argument("-d", "--debug", help="Sets logging to include additio
 runtime_args.add_argument('--do_not_verify_ssl',
                           help="Skips SSL verification for all requests.",
                           action="store_false")
-runtime_args.add_argument("-r", "--ratelimited",
-                          help="Enable rate-limiting (recommended)"
-                               "limit",
-                          action="store_true")
 runtime_args.add_argument("-f", "--force",
                           help="Update the Snipe asset with information from Ansible Cache every time even if "
                                "Snipe-IT has a newer record",
@@ -845,7 +931,7 @@ try:
     logging.debug(f"The configured Snipe-IT base url is: {CONFIG['snipe-it']['url']}")
 
     logging.info("Setting the API key for SnipeIT.")
-    logging.debug(f"The API key you provided for Snipe is: {CONFIG['snipe-it']['apikey']}")
+    # logging.debug(f"The API key you provided for Snipe is: {CONFIG['snipe-it']['apikey']}")
 
     logging.info("Getting the OS types we'll be looking for.")
     os_types = CONFIG['ansible']['os'].split(',')
@@ -865,6 +951,11 @@ if CONFIG['snipe-it']['url'].endswith("/"):
 
 if not settings_correct:
     raise SystemExit
+
+SNIPE_HEADERS = {'Authorization': f"Bearer {CONFIG['snipe-it']['apikey']}",
+                 'Accept': 'application/json',
+                 'Content-Type': 'application/json'}
+SNIPE_BACKOFF = 0
 
 # Run Testing
 # Report if we're verifying SSL or not.
@@ -975,30 +1066,13 @@ def main():
                     logging.info(f"Skipping update for {computer_name} because the Snipe record is newer.")
                     continue
 
-                if payload['serial'] == asset['serial'] or payload['serial'].startswith('ANS-'):
+                if payload['serial'].startswith('ANS-'):
                     del payload['serial']
 
-                if payload['asset_tag'] == asset['asset_tag'] or payload['asset_tag'].startswith('ANS-'):
+                if payload['asset_tag'].startswith('ANS-'):
                     del payload['asset_tag']
 
-                for key in asset:
-                    if key in payload and str(asset[key]) == str(payload[key]):
-                        del payload[key]
-
-                if payload['model_id'] == asset['model']['id']:
-                    del payload['model_id']
-                if payload['status_id'] == asset['status_label']['id']:
-                    del payload['status_id']
-                if payload['category_id'] == asset['category']['id']:
-                    del payload['category_id']
-
-                for key, value in asset['custom_fields'].items():
-                    if value['field'] in payload and str(payload[value['field']]) == str(value['value']):
-                        del payload[value['field']]
-
-                if payload:
-                    update_snipe_asset(asset['id'], payload)
-
+                update_snipe_asset(asset, payload)
                 logging.debug(f"Done updating {computer_name}")
 
             # Check if we need to check out the asset

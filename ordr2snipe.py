@@ -198,9 +198,7 @@ while next_page:
         elif snipe_asset['total'] == 1:
             logging.info(f"Existing asset in Snipe-IT for {name}")
             asset = snipe_asset['rows'][0]
-            if (payload['serial'] == asset['serial'] or
-                    payload['serial'].startswith('ORDR-') or
-                    not asset['serial'].startswith('ORDR-')):
+            if payload['serial'].startswith('ORDR-'):
                 del payload['serial']
 
             # ORDR is less accurate on these things
@@ -210,15 +208,7 @@ while next_page:
             del payload['status_id']
             del payload['category_id']
 
-            for key, value in asset['custom_fields'].items():
-                if value['field_format'] != 'MAC' and value['field'] in payload and value['value']:
-                    del payload[value['field']]
-
-            for key in asset:
-                if key in payload and html.unescape(str(asset[key])) == str(payload[key]):
-                    del payload[key]
-
             if payload:
-                ret = update_snipe_asset(asset['id'], payload)
+                ret = update_snipe_asset(asset, payload)
 
             logging.debug(f"Done updating {name}")

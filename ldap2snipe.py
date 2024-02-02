@@ -45,11 +45,10 @@ def process_result(item):
         return
 
     logging.debug(assets['rows'][0])
+    # Make Pending to Ready to Deploy
     if assets['rows'][0]['status_label']['id'] == 1:
         payload['status_id'] = 2
-    if not payload['_snipeit_ip_address_13'] or payload['_snipeit_ip_address_13'] == \
-            assets['rows'][0]['custom_fields']['IP Address']['value']:
-        del payload['_snipeit_ip_address_13']
+    # Do not update certain values if something else already set them
     if assets['rows'][0]['custom_fields']['OS Version']['value']:
         del payload['_snipeit_os_version_9']
     if assets['rows'][0]['custom_fields']['OS Build']['value']:
@@ -57,7 +56,7 @@ def process_result(item):
     if assets['rows'][0]['custom_fields']['Operating System']['value']:
         del payload['_snipeit_operating_system_8']
 
-    update_snipe_asset(assets['rows'][0]['id'], payload)
+    update_snipe_asset(assets['rows'][0], payload)
 
 
 def query_base(ldap_conn, current_ldap_base):
