@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 # This will get a list of systems from ORDR and put them into Snipe-IT as "need-to-audit" assets.
 
-import html
 import os
 
 from requests import get
@@ -78,7 +77,7 @@ while next_page:
 
         macaddress = clean_mac(device['MacAddress'])
         if not macaddress:
-            logging.warning(f"WARNING: Invalid MAC address found for {name}. Skipping.")
+            logging.warning(f"WARNING: Invalid MAC address {device['MacAddress']} found for {name}. Skipping.")
             continue
 
         if 'MfgName' in device:
@@ -140,6 +139,7 @@ while next_page:
 
         snipe_asset = get_snipe_asset(serial=serial, name=name, mac_addresses=[macaddress], asset_tag=asset_tag)
 
+        logging.debug(snipe_asset)
         if snipe_asset['total'] > 1:
             logging.error(f"Multiple assets in Snipe-IT for {name}, {serial}, {macaddress}, {asset_tag}")
             continue

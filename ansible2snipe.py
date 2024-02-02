@@ -28,6 +28,8 @@
 #       _snipeit_mac_address_1 = ansible_mac_address
 #       _snipeit_custom_name_1234567890 = ansible_dict ansible_key
 #
+from __future__ import annotations
+
 import html
 from functools import lru_cache
 from time import sleep
@@ -100,7 +102,7 @@ def get_snipe_asset(serial="", name="", mac_addresses=None, asset_tag=None) -> d
         found = cache_snipe_search(name, "NAME")
 
     # Make a list from the found dict
-    return {'rows': found, 'total': len(found)}
+    return {'rows': found, 'total': 1}
 
 
 CACHE = {"MAC": {}, "NAME": {}, "SERIAL": {}, "ASSET_TAG": {}, 'hits': 0}
@@ -138,18 +140,18 @@ def cache_response(response):
         CACHE["ASSET_TAG"][row['asset_tag'].upper()] = row
 
 
-def cache_snipe_search(search, search_type):
+def cache_snipe_search(search: str, search_type: str) -> list:
     search = search.upper()
     if search in CACHE[search_type]:
         CACHE['hits'] = CACHE['hits'] + 1
-        return CACHE[search_type][search]
+        return [CACHE[search_type][search]]
 
     # We search only the first 5 characters, that way we don't need to re-search for similar names
     response = paginated_snipe_search(search.upper()[0:5])
     cache_response(response)
 
     if search.upper() in CACHE[search_type]:
-        return CACHE[search_type][search.upper()]
+        return [CACHE[search_type][search.upper()]]
 
     return []
 
@@ -556,38 +558,41 @@ def clean_mac(mac_address: str) -> str | None:
     if mac_address[1] in ['2', '6', 'A', 'E']:
         return None
 
+    if mac_address == '000000000000' or mac_address == 'FFFFFFFFFFFF':
+        return None
+
     # Bad MAC addresses
-    # 00:00:00:00:00:00 -> invalid
+    # 000000 -> Xerox (not invalid)
     # 0A:00:27:00:00:00 -> VirtualBox
-    bad_prefix = ['000000',
-                  # HyperV
-                  '00155D',
-                  # VMWare network adapters
-                  '005056',
-                  # Belkin (USB network adapters)
-                  '00173F', '001CDF', '002275', '08863B', '149182', '24F5A2', '302303', '58EF68',
-                  '6038E0', '80691A', '94103E', '944452', 'B4750E', 'C05627', 'C4411E', 'D8EC5E',
-                  'E89F80', 'EC1A59',
-                  '001150', '0030BD',
-                  # CE Link (USB network adapters)
-                  '6C6E07', '70B3D554', 'A0CEC8',
-                  # Cable Matters (USB network adapters)
-                  'F44DAD', '5C857E30', '70886B80',
-                  # Cisco AnyConnect
-                  '00059A3C7A00', '00059A3C7800',
-                  # Apple USB dongles?
-                  '5CF7E68B',
-                  # Microsoft USB dongles?
-                  'F01DBCF2',
-                  # ASIX USB dongles?
-                  'F8E43B5B',
-                  # BizLink (Kunshan) USB dongles
-                  '9CEBE8',
-                  # Speed Dragon Multimedia USB dongle
-                  '00133BA0',
-                  # AuKey (Kingtron) USB dongles
-                  '98FC84E'
-                  ]
+    bad_prefix = [
+        # HyperV
+        '00155D',
+        # VMWare network adapters
+        '005056',
+        # Belkin (USB network adapters)
+        '00173F', '001CDF', '002275', '08863B', '149182', '24F5A2', '302303', '58EF68',
+        '6038E0', '80691A', '94103E', '944452', 'B4750E', 'C05627', 'C4411E', 'D8EC5E',
+        'E89F80', 'EC1A59',
+        '001150', '0030BD',
+        # CE Link (USB network adapters)
+        '6C6E07', '70B3D554', 'A0CEC8',
+        # Cable Matters (USB network adapters)
+        'F44DAD', '5C857E30', '70886B80',
+        # Cisco AnyConnect
+        '00059A3C7A00', '00059A3C7800',
+        # Apple USB dongles?
+        '5CF7E68B',
+        # Microsoft USB dongles?
+        'F01DBCF2',
+        # ASIX USB dongles?
+        'F8E43B5B',
+        # BizLink (Kunshan) USB dongles
+        '9CEBE8',
+        # Speed Dragon Multimedia USB dongle
+        '00133BA0',
+        # AuKey (Kingtron) USB dongles
+        '98FC84E'
+    ]
 
     # :11 is /28
     if (mac_address in bad_prefix or
@@ -636,7 +641,8 @@ def fill_macfields(current_data: dict, new_data: dict, new_macs: list):
                       '_snipeit_mac_address_22_36',
                       '_snipeit_mac_address_23_37',
                       '_snipeit_mac_address_24_38']
-    if current_data['total'] == 1:
+
+    if current_data['rows']:
         for custom_field in current_data['rows'][0]['custom_fields'].values():
             if custom_field['field_format'] == "MAC" and custom_field['value']:
                 snipe_macaddress.append(custom_field['value'])
