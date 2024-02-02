@@ -132,23 +132,21 @@ while next_page:
             logging.error(f"WARNING: Category {device['Group']} not found. Skipping.")
             continue
 
-        if macaddress:
-            asset_tag = "ORDR-" + macaddress.replace(':', '_').upper()
-        else:
-            asset_tag = "ORDR-" + name.upper()
-
-        snipe_asset = get_snipe_asset(serial=serial, name=name, mac_addresses=[macaddress], asset_tag=asset_tag)
+        snipe_asset = get_snipe_asset(serial=serial, name=name, mac_addresses=[macaddress])
 
         logging.debug(snipe_asset)
         if snipe_asset['total'] > 1:
-            logging.error(f"Multiple assets in Snipe-IT for {name}, {serial}, {macaddress}, {asset_tag}")
+            logging.error(f"Multiple assets in Snipe-IT for {name}, {serial}, {macaddress}")
             continue
 
         model_id = get_snipe_model_id(model, manufacturer, device_type)
         # Create a payload:
         if not serial:
             logging.debug(f"WARNING: Serial number not found for {name}.")
-            serial = asset_tag.replace("_", "")
+            if macaddress:
+                serial = "ORDR-" + macaddress.replace(':', '').upper()
+            else:
+                serial = "ORDR-" + name.upper()
 
         payload = {
             "name": name,
@@ -156,7 +154,6 @@ while next_page:
             "status_id": 1,
             "category_id": CONFIG.get('snipe-it', f'{device_type}_category'),
             "model_id": model_id,
-            "asset_tag": asset_tag,
             "_snipeit_vlan_17": vlan,
             "_snipeit_vlan_name_18": vlanname
         }
@@ -188,7 +185,10 @@ while next_page:
         if snipe_asset['total'] == 0:
             logging.info(f"Creating a new asset in snipe for {name}")
             logging.debug(payload)
-
+            if macaddress:
+                payload['asset_tag'] = "ORDR-" + macaddress.replace(':', '_').upper()
+            else:
+                payload['asset_tag'] = "ORDR-" + name.upper()
             if 'OsType' in device and device['OsType']:
                 payload['_snipeit_operating_system_8'] = clean_os(device['OsType'])
             if 'OsVersion' in device and device['OsVersion']:
@@ -203,7 +203,6 @@ while next_page:
 
             # ORDR is less accurate on these things
             del payload['name']
-            del payload['asset_tag']
             del payload['status_id']
             del payload['category_id']
 
