@@ -105,7 +105,7 @@ def get_snipe_asset(serial="", name="", mac_addresses=None, asset_tag=None) -> d
     return {'rows': found, 'total': len(found)}
 
 
-CACHE = {"MAC": {}, "NAME": {}, "SERIAL": {}, "ASSET_TAG": {}, 'hits': 0}
+CACHE = {"MAC": {}, "NAME": {}, "SERIAL": {}, "ASSET_TAG": {}, 'hits': 0, 'queries': []}
 
 
 def paginated_snipe_search(search, page=0):
@@ -146,8 +146,14 @@ def cache_snipe_search(search: str, search_type: str) -> list:
         CACHE['hits'] = CACHE['hits'] + 1
         return [CACHE[search_type][search]]
 
-    # We search only the first 5 characters, that way we don't need to re-search for similar names
-    response = paginated_snipe_search(search[0:5])
+    # We search only the first 6 characters, that way we don't need to re-search for similar names
+    short_search = search[0:5]
+    if short_search in CACHE['queries']:
+        return []
+
+    CACHE['queries'].append(short_search)
+
+    response = paginated_snipe_search(short_search)
     cache_response(response)
 
     if search in CACHE[search_type]:
@@ -338,7 +344,7 @@ def update_snipe_asset(old_asset, new_asset):
 
     # Clean up regular fields, don't revert to empty fields
     for key, value in old_asset.items():
-        if not str(new_asset[key]) or (key in new_asset and str(value) == str(new_asset[key])):
+        if key in new_asset and (not new_asset[key] or str(value) == str(new_asset[key])):
             del new_asset[key]
 
     # Clean up custom fields
