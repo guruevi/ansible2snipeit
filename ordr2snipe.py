@@ -132,7 +132,8 @@ while next_page:
             logging.error(f"WARNING: Category {device['Group']} not found. Skipping.")
             continue
 
-        snipe_asset = get_snipe_asset(serial=serial, name=name, mac_addresses=[macaddress])
+        # ORDR has a lot of duplicate names, but should match on serial and MAC addresses
+        snipe_asset = get_snipe_asset(serial=serial, mac_addresses=[macaddress])
 
         # logging.debug(snipe_asset)
         if snipe_asset['total'] > 1:

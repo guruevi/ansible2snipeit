@@ -182,22 +182,23 @@ for entry in tree.findall('atom:entry', namespaces):
     else:
         mac_address = None
 
-    if not asset_tag:
-        logging.info(f"No asset tag for {computer_name}")
-        payload['asset_tag'] = f"SCCM-{resourceid}"
-
+    # SCCM can have duplicate names
     snipe_asset = get_snipe_asset(serial=serial_number,
                                   mac_addresses=mac_addresses,
                                   name=computer_name,
-                                  asset_tag=payload['asset_tag'])
-
-    if not serial_number:
-        logging.error(f"No serial number for {computer_name}")
-        payload['serial'] = f"SCCM-{resourceid}"
+                                  asset_tag=asset_tag)
 
     payload = fill_macfields(snipe_asset, payload, list(mac_addresses.keys()))
 
     if not snipe_asset['total']:
+        if not serial_number:
+            logging.error(f"No serial number for {computer_name}")
+            payload['serial'] = f"SCCM-{resourceid}"
+
+        if not asset_tag:
+            logging.info(f"No asset tag for {computer_name}")
+            payload['asset_tag'] = f"SCCM-{resourceid}"
+
         asset = create_snipe_asset(payload)
     elif snipe_asset['total'] == 1:
         asset = snipe_asset['rows'][0]
@@ -209,11 +210,6 @@ for entry in tree.findall('atom:entry', namespaces):
         if update_time >= updated and not USER_ARGS.force:
             logging.info(f"Skipping update for {asset['id']} because the Snipe record is newer.")
             continue
-
-        if payload['serial'].startswith('SCCM'):
-            del payload['serial']
-        if payload['asset_tag'].startswith('SCCM'):
-            del payload['asset_tag']
 
         # Update asset
         asset = update_snipe_asset(asset, payload)
