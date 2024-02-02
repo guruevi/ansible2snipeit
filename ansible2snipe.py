@@ -359,7 +359,7 @@ def update_snipe_asset(old_asset, new_asset):
         response = snipe_api_call(f"hardware/{old_asset['id']}", payload=new_asset, method="PATCH")
 
         if "payload" not in response or not response['payload']:
-            logging.error(f"Unable to update asset: {old_asset['id']}. Received {response}")
+            logging.error(f"Unable to update asset: {old_asset['id']} with {new_asset} - {response}")
             return None
 
         return response['payload']
