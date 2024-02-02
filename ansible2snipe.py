@@ -581,9 +581,9 @@ def clean_mac(mac_address: str) -> str | None:
     # 0A:00:27:00:00:00 -> VirtualBox
     bad_prefix = [
         # HyperV
-        '00155D',
-        # VMWare network adapters
-        '005056',
+        # '00155D',
+        # # VMWare network adapters
+        # '005056',
         # Belkin (USB network adapters)
         '00173F', '001CDF', '002275', '08863B', '149182', '24F5A2', '302303', '58EF68',
         '6038E0', '80691A', '94103E', '944452', 'B4750E', 'C05627', 'C4411E', 'D8EC5E',
