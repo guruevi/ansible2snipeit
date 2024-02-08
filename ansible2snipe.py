@@ -326,8 +326,12 @@ def create_snipe_asset(payload):
 
 # Function that updates a snipe asset with a JSON payload
 def update_snipe_asset(old_asset, new_asset):
-    if 'serial_number' in new_asset and old_asset['serial'] == new_asset['serial_number']:
+    if 'serial_number' in new_asset and (old_asset['serial'] == new_asset['serial_number'] or
+                                         not clean_tag(new_asset['serial_number'])):
         del new_asset['serial_number']
+
+    if 'asset_tag' in new_asset and not clean_tag(new_asset['asset_tag']):
+        del new_asset['asset_tag']
 
     if ('status_id' in new_asset and old_asset['status_label'] and
             old_asset['status_label']['id'] == new_asset['status_id']):
@@ -671,7 +675,7 @@ def fill_macfields(current_data: dict, new_data: dict, new_macs: list):
     return new_data
 
 
-def clean_tag(value: Any) -> str | None:
+def clean_tag(value: Any) -> str:
     invalid = ["na",
                "not available",
                "default string",
@@ -693,17 +697,20 @@ def clean_tag(value: Any) -> str | None:
                "unknown",
                "dip-718s",
                "cbx3___"]
+    if not value:
+        return ''
+
     value_lower = str(value).lower()
 
     if not value_lower or len(value_lower) < 3 or value_lower in invalid:
-        return None
+        return ''
 
     if ('chassis' in value_lower or
             'asset' in value_lower or
             'to be filled' in value_lower or
             'system' in value_lower or
             '123456789' in value_lower):
-        return None
+        return ''
 
     # logging.debug(f"Clean tag: {value}")
     return str(value)
