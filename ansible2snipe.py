@@ -85,17 +85,13 @@ def get_snipe_asset(serial="", name="", mac_addresses=None, asset_tag=None) -> d
             cache_response({'rows': [response]})
             return {'rows': [response], 'total': 1}
 
-    found = []
     # If we have a valid serial number use that to uniquely identify the asset
-    if serial:
-        found = cache_snipe_search(serial, "SERIAL")
+    found = cache_snipe_search(serial, "SERIAL")
 
-    if mac_addresses:
-        # MAC addresses *should* be unique
-        for mac_address in mac_addresses:
-            if found:
-                break
-            found = cache_snipe_search(mac_address, "MAC")
+    for mac_address in mac_addresses:
+        if found:
+            break
+        found = cache_snipe_search(mac_address, "MAC")
 
     # If we have a name, we can search for that
     if not found:
@@ -141,6 +137,9 @@ def cache_response(response):
 
 
 def cache_snipe_search(search: str, search_type: str) -> list:
+    if not search:
+        return []
+
     search = search.upper()
     if search in CACHE[search_type]:
         CACHE['hits'] = CACHE['hits'] + 1
