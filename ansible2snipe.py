@@ -73,35 +73,41 @@ def search_ansible_name(name):
     return do_mongo_query({"data.ansible_hostname": name})
 
 
-def get_snipe_asset(serial="", name="", mac_addresses=None, asset_tag=None) -> dict:
+def get_snipe_asset(serial="", name="", mac_addresses=None, asset_tag="") -> dict:
+    if mac_addresses is None:
+        mac_addresses = []
+
     # Asset tags always return 1 result
     if asset_tag:
-        if asset_tag in CACHE["ASSET_TAG"]:
-            CACHE['hits'] = CACHE['hits'] + 1
-            return {'rows': [CACHE["ASSET_TAG"][asset_tag]], 'total': 1}
-
         response = snipe_api_call(f'hardware/bytag/{asset_tag}')
         if 'id' in response:
-            cache_response({'rows': [response]})
             return {'rows': [response], 'total': 1}
 
+    # Responses
+    found = []
+
     # If we have a valid serial number use that to uniquely identify the asset
-    found = cache_snipe_search(serial, "SERIAL")
+    if serial:
+        response = snipe_api_call(f'hardware/byserial/{serial}')
+        if 'total' in response and response['total'] > 0:
+            found.append(response['rows'])
 
     for mac_address in mac_addresses:
         if found:
             break
-        found = cache_snipe_search(mac_address, "MAC")
+        found.append(snipe_search(mac_address))
 
     # If we have a name, we can search for that
     if not found:
-        found = cache_snipe_search(name, "NAME")
+        # This is a fuzzy match
+        name_match = snipe_search(name)
+        # For each result, check if the name is a perfect match
+        for asset in name_match:
+            if not found and asset['name'] == name:
+                found.append(asset)
 
     # Make a list from the found dict
     return {'rows': found, 'total': len(found)}
-
-
-CACHE = {"MAC": {}, "NAME": {}, "SERIAL": {}, "ASSET_TAG": {}, 'hits': 0, 'queries': []}
 
 
 def paginated_snipe_search(search, page=0):
@@ -125,49 +131,14 @@ def paginated_snipe_search(search, page=0):
     return response
 
 
-def cache_response(response):
-    for row in response['rows']:
-        for field_name, field in row['custom_fields'].items():
-            if field['field_format'] == 'MAC':
-                CACHE["MAC"][field['value'].upper()] = row
-
-        CACHE["NAME"][html.unescape(row['name']).upper()] = row
-        CACHE["SERIAL"][row['serial'].upper()] = row
-        CACHE["ASSET_TAG"][row['asset_tag'].upper()] = row
-
-
-def cache_snipe_search(search: str, search_type: str) -> list:
+def snipe_search(search: str) -> list:
     if not search:
         return []
 
     search = search.upper()
-    if search in CACHE[search_type]:
-        CACHE['hits'] = CACHE['hits'] + 1
-        return [CACHE[search_type][search]]
 
-    # We search only the first 6 characters, that way we don't need to re-search for similar names
-    short_search = search[0:5]
-    if short_search in CACHE['queries']:
-        return []
-
-    CACHE['queries'].append(short_search)
-
-    response = paginated_snipe_search(short_search)
-    cache_response(response)
-
-    if search in CACHE[search_type]:
-        return [CACHE[search_type][search]]
-
-    return []
-
-
-def get_cache_stats():
-    return (f"Cache hits: {CACHE['hits']}\n"
-            f"Cache size:\n"
-            f"{len(CACHE['MAC'])} MACs\n"
-            f"{len(CACHE['NAME'])} names\n"
-            f"{len(CACHE['SERIAL'])} serials\n"
-            f"{len(CACHE['ASSET_TAG'])} asset tags\n")
+    results = paginated_snipe_search(search)
+    return results['rows']
 
 
 def snipe_api_call(endpoint, payload=None, method="GET"):

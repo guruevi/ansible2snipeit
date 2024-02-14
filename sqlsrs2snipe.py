@@ -11,7 +11,7 @@ import requests
 from requests_ntlm import HttpNtlmAuth
 from ansible2snipe import (get_snipe_model_id, get_snipe_asset, clean_tag, create_snipe_asset, update_snipe_asset,
                            checkout_snipe_asset, USER_ARGS, CONFIG, clean_mac, clean_manufacturer, fill_macfields,
-                           validate_ip, get_cache_stats)
+                           validate_ip)
 import xmltodict
 
 # Stat file
@@ -225,5 +225,3 @@ for entry in tree.findall('atom:entry', namespaces):
 
     if (USER_ARGS.users or USER_ARGS.users_force) and top_console_user:
         checkout_snipe_asset(top_console_user, asset)
-
-logging.info(get_cache_stats())
