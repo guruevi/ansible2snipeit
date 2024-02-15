@@ -90,7 +90,6 @@ def get_snipe_asset(serial="", name="", mac_addresses=None, asset_tag="") -> dic
     if serial:
         response = snipe_api_call(f'hardware/byserial/{serial}')
         if 'total' in response and response['total'] > 0:
-            print(response['rows'])
             found.extend(response['rows'])
 
     for mac_address in mac_addresses:
