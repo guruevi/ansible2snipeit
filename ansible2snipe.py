@@ -90,12 +90,13 @@ def get_snipe_asset(serial="", name="", mac_addresses=None, asset_tag="") -> dic
     if serial:
         response = snipe_api_call(f'hardware/byserial/{serial}')
         if 'total' in response and response['total'] > 0:
-            found.append(response['rows'])
+            print(response['rows'])
+            found.extend(response['rows'])
 
     for mac_address in mac_addresses:
         if found:
             break
-        found.append(snipe_search(mac_address))
+        found.extend(snipe_search(mac_address))
 
     # If we have a name, we can search for that
     if not found:
@@ -104,7 +105,7 @@ def get_snipe_asset(serial="", name="", mac_addresses=None, asset_tag="") -> dic
         # For each result, check if the name is a perfect match
         for asset in name_match:
             if not found and asset['name'] == name:
-                found.append(asset)
+                found.extend(asset)
 
     # Make a list from the found dict
     return {'rows': found, 'total': len(found)}
@@ -127,7 +128,7 @@ def paginated_snipe_search(search, page=0):
     if response['total'] > payload['limit'] + payload['offset']:
         response['rows'].extend(paginated_snipe_search(search, page + 1)['rows'])
 
-    # logging.debug(response)
+    logging.debug(response)
     return response
 
 
