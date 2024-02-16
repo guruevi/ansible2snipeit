@@ -150,19 +150,22 @@ for entry in tree.findall('atom:entry', namespaces):
     if model:
         model = model.replace("Dell System ", "").replace("Dell ", "")
 
-    if str(serial_number).lower() == str(model).lower():
-        serial_number = ""
-
-    if str(asset_tag).lower() == str(model).lower():
-        asset_tag = ""
-
     model_id = get_snipe_model_id(model, manufacturer, "computer")
     payload = {"name": computer_name,
-               "serial": str(serial_number).upper(),
                "model_id": model_id, "asset_tag": str(asset_tag).upper(),
                "status_id": 2, "category_id": 2, '_snipeit_ram_2': round(int(memory) / 1024),
                '_snipeit_operating_system_8': operating_system,
                "_snipeit_management_40": "SCCM"}
+
+    if serial_number and str(serial_number).upper() != str(model).upper():
+        payload["serial"] = str(serial_number).upper()
+
+    if not serial_number:
+        logging.error(f"No serial number for {computer_name}")
+        payload['serial'] = f"SCCM-{resourceid}"
+
+    if asset_tag and str(asset_tag).upper() != str(model).upper():
+        payload['asset_tag'] = str(asset_tag).upper()
 
     # Custom fields
     if service_pack_level:
@@ -191,10 +194,6 @@ for entry in tree.findall('atom:entry', namespaces):
                                   asset_tag=asset_tag)
 
     if not snipe_asset['total']:
-        if not serial_number:
-            logging.error(f"No serial number for {computer_name}")
-            payload['serial'] = f"SCCM-{resourceid}"
-
         if not asset_tag:
             logging.info(f"No asset tag for {computer_name}")
             payload['asset_tag'] = f"SCCM-{resourceid}"
