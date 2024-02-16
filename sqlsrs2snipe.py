@@ -215,7 +215,7 @@ for entry in tree.findall('atom:entry', namespaces):
             logging.info(f"Skipping update for {asset['id']} because the Snipe record is newer.")
             continue
 
-        if asset['custom_fields']['IP Address']['value'] not in ip_addresses:
+        if ip_addresses and asset['custom_fields']['IP Address']['value'] not in ip_addresses:
             payload['_snipeit_ip_address_13'] = ip_addresses[0]
 
         payload = fill_macfields(asset, payload, mac_addresses)
