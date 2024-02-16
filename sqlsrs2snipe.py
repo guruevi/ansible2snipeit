@@ -64,7 +64,7 @@ def find_network_info(name) -> (list[str], list[str]):
                 all_ip.append(str(ip))
             if mac:
                 all_mac.append(mac)
-    return all_ip, all_mac
+    return all_mac, all_ip
 
 
 namespaces = {'m': 'http://schemas.microsoft.com/ado/2007/08/dataservices/metadata',
