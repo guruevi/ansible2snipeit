@@ -176,25 +176,23 @@ for entry in tree.findall('atom:entry', namespaces):
         payload['_snipeit_console_user_39'] = top_console_user
 
     # Get network info
-    mac_addresses = find_network_info(computer_name)
-    if mac_addresses:
-        mac_address = next(iter(mac_addresses))
-        ip_address = next(iter(mac_addresses.values()))
+    mac_ip_addresses = find_network_info(computer_name)
+    if mac_ip_addresses:
+        mac_addresses = mac_ip_addresses.keys()
+        ip_address = mac_ip_addresses.values()[0]
         # Validate IP addresses
         try:
             payload['_snipeit_ip_address_13'] = str(ipaddress.ip_address(ip_address))
         except ValueError:
             print(f"Error: {ip_address} is not a correct IP address.")
     else:
-        mac_address = None
+        mac_addresses = []
 
     # SCCM can have duplicate names
     snipe_asset = get_snipe_asset(serial=serial_number,
                                   mac_addresses=mac_addresses,
                                   name=computer_name,
                                   asset_tag=asset_tag)
-
-    payload = fill_macfields(snipe_asset, payload, list(mac_addresses.keys()))
 
     if not snipe_asset['total']:
         if not serial_number:
@@ -204,6 +202,8 @@ for entry in tree.findall('atom:entry', namespaces):
         if not asset_tag:
             logging.info(f"No asset tag for {computer_name}")
             payload['asset_tag'] = f"SCCM-{resourceid}"
+
+        payload = fill_macfields({}, payload, mac_ip_addresses.keys())
 
         asset = create_snipe_asset(payload)
     elif snipe_asset['total'] == 1:
@@ -216,6 +216,8 @@ for entry in tree.findall('atom:entry', namespaces):
         if update_time >= updated and not USER_ARGS.force:
             logging.info(f"Skipping update for {asset['id']} because the Snipe record is newer.")
             continue
+
+        payload = fill_macfields(asset, payload, mac_ip_addresses.keys())
 
         # Update asset
         asset = update_snipe_asset(asset, payload)

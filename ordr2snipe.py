@@ -196,13 +196,12 @@ while next_page:
             if 'OsVersion' in device and device['OsVersion']:
                 os_version = device['OsVersion']
                 payload['_snipeit_os_version_9'] = os_version
-            payload['_snipeit_mac_address_1'] = macaddress
+            payload = fill_macfields(asset, payload, [macaddress])
             asset = create_snipe_asset(payload)
         elif snipe_asset['total'] == 1:
             logging.info(f"Existing asset in Snipe-IT for {name}")
             asset = snipe_asset['rows'][0]
-            print(snipe_asset)
-            payload = fill_macfields(snipe_asset, payload, [macaddress])
+            payload = fill_macfields(asset, payload, [macaddress])
             if payload['serial'].startswith('ORDR-'):
                 del payload['serial']
 

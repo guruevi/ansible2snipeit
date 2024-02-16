@@ -99,6 +99,7 @@ for file in os.listdir(f'{INPUT_DIR}'):
                     continue
 
                 if snipe_asset['total'] == 1:
+                    asset = snipe_asset['rows'][0]
                     logging.info(f"Existing Asset found in Snipe-IT for {name}, {serial}, {macaddress} or {asset_tag} ")
                     # Update the asset if asset tag is passed
                     payload = {}
@@ -111,15 +112,15 @@ for file in os.listdir(f'{INPUT_DIR}'):
                     if ip:
                         payload["_snipeit_ip_address_13"] = ip
                     if macaddresses:
-                        payload = fill_macfields(snipe_asset, payload, macaddresses)
+                        payload = fill_macfields(asset, payload, macaddresses)
                     if operating_system:
                         payload["_snipeit_operating_system_8"] = operating_system
                     # Set any "Pending" to "Unmanaged (Research)"
-                    if snipe_asset['rows'][0]['status_label']['id'] == 1:
+                    if asset['status_label']['id'] == 1:
                         payload['status_id'] = 4
 
                     payload['notes'] = f"Imported from {file}. {owner} is the owner."
-                    update_snipe_asset(snipe_asset['rows'][0], payload)
+                    update_snipe_asset(asset, payload)
                     continue
 
                 # If we have no assets, create one

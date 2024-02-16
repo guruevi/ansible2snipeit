@@ -631,8 +631,8 @@ def fill_macfields(current_data: dict, new_data: dict, new_macs: list):
                       '_snipeit_mac_address_23_37',
                       '_snipeit_mac_address_24_38']
 
-    if current_data['rows']:
-        for custom_field in current_data['rows'][0]['custom_fields'].values():
+    if current_data['custom_fields']:
+        for custom_field in current_data['custom_fields'].values():
             if custom_field['field_format'] == "MAC" and custom_field['value']:
                 snipe_macaddress.append(custom_field['value'])
                 free_mac_field.remove(custom_field['field'])
