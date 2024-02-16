@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 # Open XML file
+from __future__ import annotations
+
 import html
 import ipaddress
 from datetime import datetime
 import logging
 import os
 import xml.etree.ElementTree as ElementTree
+from typing import Dict, Any
 
 import requests
 from requests_ntlm import HttpNtlmAuth
@@ -49,16 +52,19 @@ with open('report2.xml') as fd:
 NETWORK_INFO = network_doc['feed']['entry']
 
 
-def find_network_info(name) -> dict[str]:
-    device_info = {}
+def find_network_info(name) -> (list[str], list[str]):
+    all_mac = []
+    all_ip = []
     for xmlentry in NETWORK_INFO:
         this_computer = xmlentry['content']['m:properties']['d:Details_Table0_ComputerName']
         if this_computer.upper() == name.upper():
             ip = validate_ip(xmlentry['content']['m:properties']['d:IP_Address'])
             mac = clean_mac(xmlentry['content']['m:properties']['d:MAC_Address'])
-            if ip and mac:
-                device_info[mac] = ip
-    return device_info
+            if ip:
+                all_ip.append(str(ip))
+            if mac:
+                all_mac.append(mac)
+    return all_ip, all_mac
 
 
 namespaces = {'m': 'http://schemas.microsoft.com/ado/2007/08/dataservices/metadata',
@@ -176,17 +182,7 @@ for entry in tree.findall('atom:entry', namespaces):
         payload['_snipeit_console_user_39'] = top_console_user
 
     # Get network info
-    mac_ip_addresses = find_network_info(computer_name)
-    if mac_ip_addresses:
-        mac_addresses = mac_ip_addresses.keys()
-        ip_address = mac_ip_addresses.values()[0]
-        # Validate IP addresses
-        try:
-            payload['_snipeit_ip_address_13'] = str(ipaddress.ip_address(ip_address))
-        except ValueError:
-            print(f"Error: {ip_address} is not a correct IP address.")
-    else:
-        mac_addresses = []
+    (mac_addresses, ip_addresses) = find_network_info(computer_name)
 
     # SCCM can have duplicate names
     snipe_asset = get_snipe_asset(serial=serial_number,
@@ -203,7 +199,9 @@ for entry in tree.findall('atom:entry', namespaces):
             logging.info(f"No asset tag for {computer_name}")
             payload['asset_tag'] = f"SCCM-{resourceid}"
 
-        payload = fill_macfields({}, payload, mac_ip_addresses.keys())
+        payload = fill_macfields({}, payload, mac_addresses)
+        if ip_addresses:
+            payload['_snipeit_ip_address_13'] = ip_addresses[0]
 
         asset = create_snipe_asset(payload)
     elif snipe_asset['total'] == 1:
@@ -217,7 +215,10 @@ for entry in tree.findall('atom:entry', namespaces):
             logging.info(f"Skipping update for {asset['id']} because the Snipe record is newer.")
             continue
 
-        payload = fill_macfields(asset, payload, mac_ip_addresses.keys())
+        if asset['custom_fields']['IP Address']['value'] not in ip_addresses:
+            payload['_snipeit_ip_address_13'] = ip_addresses[0]
+
+        payload = fill_macfields(asset, payload, mac_addresses)
 
         # Update asset
         asset = update_snipe_asset(asset, payload)
