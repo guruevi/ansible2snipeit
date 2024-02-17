@@ -22,6 +22,10 @@ ldap_filter = domain_creds['ldap_filter']
 def process_result(item):
     logging.debug(item)
 
+    if 'Windows' in item['os']:
+        # Skipping Windows systems since they are already in SCCM
+        return
+
     ou = item['canonicalname'].split('/')[:-1]
     ou_text = "/".join(ou)
     payload = {"name": item['cn'].upper(),
