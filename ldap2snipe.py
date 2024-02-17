@@ -22,8 +22,8 @@ ldap_filter = domain_creds['ldap_filter']
 def process_result(item):
     logging.debug(item)
 
-    if 'Windows' in item['os']:
-        # Skipping Windows systems since they are already in SCCM
+    if 'Windows 1' in item['os']:
+        # Skipping Windows 10/11 systems since they are already in SCCM
         return
 
     ou = item['canonicalname'].split('/')[:-1]
@@ -42,13 +42,13 @@ def process_result(item):
     except (ValueError, KeyError):
         print(f"Error: {payload['name']} has no correct IP address.")
 
-    asset_tag = "LDAP-{}".format(item['cn'].upper())
-    assets = get_snipe_asset(name=item['cn'].upper(), asset_tag=asset_tag)
+    assets = get_snipe_asset(name=item['cn'].upper())
     if assets['total'] == 0:
-        logging.info(f"No assets found, wait to appear in JAMF/SCCM")
+        logging.debug(f"No assets found, wait to appear in JAMF/SCCM")
         return
     elif assets['total'] > 1:
-        logging.error(f"More than one asset found {item['cn']}")
+        # Duplicate asset names are common
+        logging.debug(f"More than one asset found {item['cn']}")
         return
 
     logging.debug(assets['rows'][0])
