@@ -587,7 +587,11 @@ def clean_mac(mac_address: str) -> str | None:
         # These are serially generated (00, 01, ...) and not unique
         '00189EA9',
         # Realtek USB dongles
-        '00E04C68'
+        '00E04C68',
+        # Cisco-Linksys dongles
+        'C8D719C3426D',
+        # Dell USB dongle
+        '509A4C1B0BC4'
     ]
 
     # :11 is /28

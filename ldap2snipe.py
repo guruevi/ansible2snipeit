@@ -41,12 +41,7 @@ def process_result(item):
     asset_tag = "LDAP-{}".format(item['cn'].upper())
     assets = get_snipe_asset(name=item['cn'].upper(), asset_tag=asset_tag)
     if assets['total'] == 0:
-        logging.info(f"No assets found, creating {item['cn']}")
-        payload['category_id'] = 2
-        payload['status_id'] = 2
-        payload['model_id'] = 11
-        payload['asset_tag'] = asset_tag
-        create_snipe_asset(payload)
+        logging.info(f"No assets found, wait to appear in JAMF/SCCM")
         return
     elif assets['total'] > 1:
         logging.error(f"More than one asset found {item['cn']}")
