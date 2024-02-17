@@ -585,7 +585,9 @@ def clean_mac(mac_address: str) -> str | None:
         '98EECBB21088',
         # OmniKey RFID dongle virtual MAC
         # These are serially generated (00, 01, ...) and not unique
-        '00189EA9'
+        '00189EA9',
+        # Realtek USB dongles
+        '00E04C68'
     ]
 
     # :11 is /28

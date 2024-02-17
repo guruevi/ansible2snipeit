@@ -160,10 +160,6 @@ for entry in tree.findall('atom:entry', namespaces):
     if serial_number and str(serial_number).upper() != str(model).upper():
         payload["serial"] = str(serial_number).upper()
 
-    if not serial_number:
-        logging.error(f"No serial number for {computer_name}")
-        payload['serial'] = f"SCCM-{resourceid}"
-
     if asset_tag and str(asset_tag).upper() != str(model).upper():
         payload['asset_tag'] = str(asset_tag).upper()
 
@@ -194,6 +190,11 @@ for entry in tree.findall('atom:entry', namespaces):
                                   asset_tag=asset_tag)
 
     if not snipe_asset['total']:
+        # If serial number is not found, use the resourceid
+        # Serial number is required for Snipe-IT asset creation (not update)
+        if not serial_number:
+            logging.error(f"No serial number for {computer_name}")
+            payload['serial'] = f"SCCM-{resourceid}"
         if not asset_tag:
             logging.info(f"No asset tag for {computer_name}")
             payload['asset_tag'] = f"SCCM-{resourceid}"
