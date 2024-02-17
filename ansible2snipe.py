@@ -592,7 +592,10 @@ def clean_mac(mac_address: str) -> str | None:
         'C8D719C3426D',
         # Dell USB dongle
         '509A4C1B0BC4',
-        '605B3021'
+        '605B3021',
+        'C025A5ED7191',
+        # Tp-Link Technologies Co.,Ltd.
+        '984827'
     ]
 
     # :11 is /28
