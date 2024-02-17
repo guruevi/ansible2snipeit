@@ -556,7 +556,7 @@ def clean_mac(mac_address: str) -> str | None:
     bad_prefix = [
         # HyperV
         # '00155D',
-        # # VMWare network adapters
+        # VMWare network adapters
         # '005056',
         # Belkin (USB network adapters)
         '00173F', '001CDF', '002275', '08863B', '149182', '24F5A2', '302303', '58EF68',
@@ -580,7 +580,12 @@ def clean_mac(mac_address: str) -> str | None:
         # Speed Dragon Multimedia USB dongle
         '00133BA0',
         # AuKey (Kingtron) USB dongles
-        '98FC84E'
+        '98FC84E',
+        #  Wistron Infocomm (Zhongshan) Corporation dongle
+        '98EECBB21088',
+        # OmniKey RFID dongle virtual MAC
+        # These are serially generated (00, 01, ...) and not unique
+        '00189EA9'
     ]
 
     # :11 is /28
