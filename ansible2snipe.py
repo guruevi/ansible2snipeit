@@ -591,7 +591,8 @@ def clean_mac(mac_address: str) -> str | None:
         # Cisco-Linksys dongles
         'C8D719C3426D',
         # Dell USB dongle
-        '509A4C1B0BC4'
+        '509A4C1B0BC4',
+        '605B3021'
     ]
 
     # :11 is /28
