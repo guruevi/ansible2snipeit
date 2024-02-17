@@ -186,7 +186,6 @@ for entry in tree.findall('atom:entry', namespaces):
     # SCCM can have duplicate names
     snipe_asset = get_snipe_asset(serial=serial_number,
                                   mac_addresses=mac_addresses,
-                                  name=computer_name,
                                   asset_tag=asset_tag)
 
     if not snipe_asset['total']:

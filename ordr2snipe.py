@@ -144,10 +144,7 @@ while next_page:
         # Create a payload:
         if not serial:
             logging.debug(f"WARNING: Serial number not found for {name}.")
-            if macaddress:
-                serial = "ORDR-" + macaddress.replace(':', '').upper()
-            else:
-                serial = "ORDR-" + name.upper()
+            serial = "ORDR-" + macaddress.replace(':', '').upper()
 
         payload = {
             "name": name,
