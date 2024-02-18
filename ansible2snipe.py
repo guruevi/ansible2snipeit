@@ -550,7 +550,7 @@ def clean_mac(mac_address: str) -> str | None:
     if mac_address == '000000000000' or mac_address == 'FFFFFFFFFFFF':
         return None
 
-    # Bad MAC addresses
+    # Bad MAC addresses, typically due to being USB dongles
     # 000000 -> Xerox (not invalid)
     # 0A:00:27:00:00:00 -> VirtualBox
     bad_prefix = [
@@ -558,6 +558,8 @@ def clean_mac(mac_address: str) -> str | None:
         # '00155D',
         # VMWare network adapters
         # '005056',
+        # This one is in lots of places
+        '005056C00001',
         # Belkin (USB network adapters)
         '00173F', '001CDF', '002275', '08863B', '149182', '24F5A2', '302303', '58EF68',
         '6038E0', '80691A', '94103E', '944452', 'B4750E', 'C05627', 'C4411E', 'D8EC5E',
@@ -569,8 +571,9 @@ def clean_mac(mac_address: str) -> str | None:
         'F44DAD', '5C857E30', '70886B80',
         # Cisco AnyConnect
         '00059A3C7A00', '00059A3C7800',
-        # Apple USB dongles?
+        # Apple USB dongles
         '5CF7E68B',
+        'AC7F3EE6DDE5'
         # Microsoft USB dongles?
         'F01DBCF2',
         # ASIX USB dongles?
@@ -585,17 +588,20 @@ def clean_mac(mac_address: str) -> str | None:
         '98EECBB21088',
         # OmniKey RFID dongle virtual MAC
         # These are serially generated (00, 01, ...) and not unique
-        '00189EA9',
+        '00189E',
         # Realtek USB dongles
-        '00E04C68',
+        '00E04C'
         # Cisco-Linksys dongles
         'C8D719C3426D',
         # Dell USB dongle
         '509A4C1B0BC4',
         '605B3021',
         'C025A5ED7191',
+        '3C2C30F82A34'
         # Tp-Link Technologies Co.,Ltd.
-        '984827'
+        '984827',
+        # Shenzen Cudy Technology Co., Ltd.
+        'B44BD62'
     ]
 
     # :11 is /28

@@ -163,6 +163,12 @@ for entry in tree.findall('atom:entry', namespaces):
     if asset_tag and str(asset_tag).upper() != str(model).upper():
         payload['asset_tag'] = str(asset_tag).upper()
 
+    if not asset_tag:
+        asset_tag = f"SCCM-{computer_name}"
+
+    if not serial_number:
+        serial_number = f"SCCM-{resourceid}"
+
     # Custom fields
     if service_pack_level:
         payload['_snipeit_os_version_9'] = service_pack_level
@@ -182,21 +188,22 @@ for entry in tree.findall('atom:entry', namespaces):
 
     # Get network info
     (mac_addresses, ip_addresses) = find_network_info(computer_name)
-
+    # Sometimes we have duplicates
+    mac_addresses = list(set(mac_addresses))
+    ip_addresses = list(set(ip_addresses))
     # SCCM can have duplicate names
     snipe_asset = get_snipe_asset(serial=serial_number,
                                   mac_addresses=mac_addresses,
                                   asset_tag=asset_tag)
 
     if not snipe_asset['total']:
-        # If serial number is not found, use the resourceid
+        # If serial number is not found, we don't want to update an existing asset
         # Serial number is required for Snipe-IT asset creation (not update)
-        if not serial_number:
-            logging.error(f"No serial number for {computer_name}")
-            payload['serial'] = f"SCCM-{resourceid}"
-        if not asset_tag:
-            logging.info(f"No asset tag for {computer_name}")
-            payload['asset_tag'] = f"SCCM-{resourceid}"
+        if 'serial' not in payload:
+            payload['serial'] = serial_number
+
+        if 'asset_tag' not in payload:
+            payload['asset_tag'] = asset_tag
 
         payload = fill_macfields({}, payload, mac_addresses)
         if ip_addresses:
