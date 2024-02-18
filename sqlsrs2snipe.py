@@ -212,22 +212,24 @@ for entry in tree.findall('atom:entry', namespaces):
         asset = create_snipe_asset(payload)
     elif snipe_asset['total'] == 1:
         asset = snipe_asset['rows'][0]
-        asset_id = asset['id']
-
-        update_time = asset['updated_at']['datetime']
-        # Convert to datetime object
-        update_time = datetime.strptime(update_time, '%Y-%m-%d %H:%M:%S')
-        if update_time >= updated and not USER_ARGS.force:
-            logging.info(f"Skipping update for {asset['id']} because the Snipe record is newer.")
-            continue
 
         if ip_addresses and asset['custom_fields']['IP Address']['value'] not in ip_addresses:
             payload['_snipeit_ip_address_13'] = ip_addresses[0]
 
         payload = fill_macfields(asset, payload, mac_addresses)
 
-        # Update asset
-        asset = update_snipe_asset(asset, payload)
+        # If we have a different serial number, we matched on MAC, create a new asset
+        if 'serial' in payload and str(asset['serial']).upper() != str(payload['serial']).upper():
+            asset = create_snipe_asset(payload)
+        else:
+            update_time = asset['updated_at']['datetime']
+            # Convert to datetime object
+            update_time = datetime.strptime(update_time, '%Y-%m-%d %H:%M:%S')
+
+            if update_time >= updated and not USER_ARGS.force:
+                logging.info(f"Skipping update for {asset['id']} because the Snipe record is newer.")
+                continue
+            asset = update_snipe_asset(asset, payload)
     else:
         logging.error(f"Multiple assets found for {computer_name}")
         continue
