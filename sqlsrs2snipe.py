@@ -159,15 +159,13 @@ for entry in tree.findall('atom:entry', namespaces):
 
     if serial_number and str(serial_number).upper() != str(model).upper():
         payload["serial"] = str(serial_number).upper()
+    else:
+        serial_number = f"SCCM-{resourceid}"
 
     if asset_tag and str(asset_tag).upper() != str(model).upper():
         payload['asset_tag'] = str(asset_tag).upper()
-
-    if not asset_tag:
+    else:
         asset_tag = f"SCCM-{computer_name}"
-
-    if not serial_number:
-        serial_number = f"SCCM-{resourceid}"
 
     # Custom fields
     if service_pack_level:
