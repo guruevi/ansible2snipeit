@@ -581,7 +581,7 @@ def clean_mac(mac_address: str) -> str | None:
         # BizLink (Kunshan) USB dongles
         '9CEBE8',
         # Speed Dragon Multimedia USB dongle
-        '00133BA0',
+        '00133B',
         # AuKey (Kingtron) USB dongles
         '98FC84E',
         #  Wistron Infocomm (Zhongshan) Corporation dongle
