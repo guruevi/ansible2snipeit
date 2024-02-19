@@ -83,14 +83,14 @@ def get_snipe_asset(serial="", name="", mac_addresses=None, asset_tag="") -> dic
         if 'id' in response:
             return {'rows': [response], 'total': 1}
 
-    # Responses
-    found = []
-
     # If we have a valid serial number use that to uniquely identify the asset
     if serial:
         response = snipe_api_call(f'hardware/byserial/{serial}')
         if 'total' in response and response['total'] > 0:
-            found.extend(response['rows'])
+            return response
+
+    # Responses
+    found = []
 
     for mac_address in mac_addresses:
         if found:
