@@ -230,7 +230,7 @@ def get_snipe_model_id(model, manufacturer, device_type="computer"):
     if not MODELNUMBERS:
         MODELNUMBERS = get_snipe_models()
 
-    if not clean_tag(model):
+    if not model:
         logging.debug(f"Invalid model name {model} -> Unknown")
         return MODELNUMBERS['Unknown']
 
@@ -289,7 +289,8 @@ def create_snipe_asset(payload):
     if response['status'] == "error":
         logging.error(f"Asset creation failed for asset {payload['name']} with error {response['messages']}")
         logging.error(f"{payload}")
-        raise SystemExit("Asset creation failed")
+        return None
+        # raise SystemExit("Asset creation failed")
 
     return response['payload']
 
@@ -688,10 +689,10 @@ def clean_tag(value: Any) -> str:
                "unknown",
                "dip-718s",
                "cbx3___"]
-    if not value:
+    if not value or not str(value):
         return ''
 
-    value_lower = str(value).lower()
+    value_lower = str(value).lower().strip()
 
     if not value_lower or len(value_lower) < 3 or value_lower in invalid:
         return ''
@@ -704,7 +705,7 @@ def clean_tag(value: Any) -> str:
         return ''
 
     # logging.debug(f"Clean tag: {value}")
-    return str(value)
+    return str(value).strip()
 
 
 def clean_manufacturer(manufacturer):

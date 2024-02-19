@@ -147,23 +147,25 @@ for entry in tree.findall('atom:entry', namespaces):
     # Get Details_Table0_DiskSpaceMB
     disk_space = properties.find('d:Details_Table0_DiskSpaceMB', namespaces).text
 
-    if model:
+    if model and 'Dell' in model:
         model = model.replace("Dell System ", "").replace("Dell ", "")
 
     model_id = get_snipe_model_id(model, manufacturer, "computer")
     payload = {"name": computer_name,
-               "model_id": model_id, "asset_tag": str(asset_tag).upper(),
-               "status_id": 2, "category_id": 2, '_snipeit_ram_2': round(int(memory) / 1024),
+               "model_id": model_id,
+               "status_id": 2,
+               "category_id": 2,
+               '_snipeit_ram_2': round(int(memory) / 1024),
                '_snipeit_operating_system_8': operating_system,
                "_snipeit_management_40": "SCCM"}
 
-    if serial_number and str(serial_number).upper() != str(model).upper():
-        payload["serial"] = str(serial_number).upper()
+    if serial_number and serial_number.upper() != model.upper():
+        payload["serial"] = serial_number.upper()
     else:
         serial_number = f"SCCM-{resourceid}"
 
-    if asset_tag and str(asset_tag).upper() != str(model).upper():
-        payload['asset_tag'] = str(asset_tag).upper()
+    if asset_tag and asset_tag.upper() != model.upper():
+        payload['asset_tag'] = asset_tag.upper()
     else:
         asset_tag = f"SCCM-{computer_name}"
 
@@ -217,7 +219,7 @@ for entry in tree.findall('atom:entry', namespaces):
         payload = fill_macfields(asset, payload, mac_addresses)
 
         # If we have a different serial number, we matched on MAC, create a new asset
-        if 'serial' in payload and str(asset['serial']).upper() != str(payload['serial']).upper():
+        if 'serial' in payload and str(asset['serial']).upper() != payload['serial'].upper():
             asset = create_snipe_asset(payload)
         else:
             update_time = asset['updated_at']['datetime']
