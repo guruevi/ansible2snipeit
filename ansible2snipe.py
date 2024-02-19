@@ -394,7 +394,7 @@ def checkout_snipe_asset(username, asset):
 
     user_id = get_snipe_user_id(username)
     if not user_id:
-        logging.error(f"User {username} not found")
+        logging.debug(f"User {username} not found")
         return False
 
     if 'assigned_to' in asset and asset['assigned_to']:
