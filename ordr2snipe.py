@@ -198,6 +198,9 @@ while next_page:
         elif snipe_asset['total'] == 1:
             logging.info(f"Existing asset in Snipe-IT for {name}")
             asset = snipe_asset['rows'][0]
+            if not asset or 'id' not in asset:
+                logging.error(f"Asset not found for {name}")
+                continue
             payload = fill_macfields(asset, payload, [macaddress])
             if payload['serial'].startswith('ORDR-'):
                 del payload['serial']
@@ -207,17 +210,20 @@ while next_page:
             del payload['status_id']
             del payload['category_id']
 
-            if not asset['custom_fields']['Operating System']['value'] and 'OsType' in device and device['OsType']:
-                payload['_snipeit_operating_system_8'] = clean_os(device['OsType'])
+            try:
+                if not asset['custom_fields']['Operating System']['value'] and 'OsType' in device and device['OsType']:
+                    payload['_snipeit_operating_system_8'] = clean_os(device['OsType'])
 
-            if not asset['custom_fields']['OS Version']['value'] and 'OsVersion' in device and device['OsVersion']:
-                payload['_snipeit_os_version_9'] = device['OsVersion']
+                if not asset['custom_fields']['OS Version']['value'] and 'OsVersion' in device and device['OsVersion']:
+                    payload['_snipeit_os_version_9'] = device['OsVersion']
 
-            if 'ou' in device and asset['custom_fields']['OU']['value']:
-                del payload['_snipeit_ou_12']
+                if 'ou' in device and asset['custom_fields']['OU']['value']:
+                    del payload['_snipeit_ou_12']
 
-            if 'ou' in device and asset['custom_fields']['Domain']['value']:
-                del payload['_snipeit_domain_11']
+                if 'ou' in device and asset['custom_fields']['Domain']['value']:
+                    del payload['_snipeit_domain_11']
+            except (KeyError, ValueError):
+                logging.error(f"Error: {name} has incorrect custom fields.")
 
             if payload['model_id'] == 11 or asset['model']['id'] != 11:
                 del payload['model_id']
