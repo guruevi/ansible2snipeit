@@ -147,10 +147,7 @@ while next_page:
             serial = "ORDR-" + macaddress.replace(':', '').upper()
 
         payload = {
-            "name": name,
             "serial": serial,
-            "status_id": 1,
-            "category_id": CONFIG.get('snipe-it', f'{device_type}_category'),
             "model_id": model_id,
             "_snipeit_vlan_17": vlan,
             "_snipeit_vlan_name_18": vlanname
@@ -183,6 +180,10 @@ while next_page:
 
         if snipe_asset['total'] == 0:
             logging.info(f"Creating a new asset in snipe for {name}")
+            payload['status_id'] = 1
+            payload['name'] = name
+            payload['category_id'] = CONFIG.get('snipe-it', f'{device_type}_category'),
+
             # logging.debug(payload)
             if macaddress:
                 payload['asset_tag'] = "ORDR-" + macaddress.replace(':', '_').upper()
@@ -206,10 +207,6 @@ while next_page:
                 del payload['serial']
 
             # ORDR is less accurate on these things
-            del payload['name']
-            del payload['status_id']
-            del payload['category_id']
-
             try:
                 if not asset['custom_fields']['Operating System']['value'] and 'OsType' in device and device['OsType']:
                     payload['_snipeit_operating_system_8'] = clean_os(device['OsType'])
@@ -217,10 +214,10 @@ while next_page:
                 if not asset['custom_fields']['OS Version']['value'] and 'OsVersion' in device and device['OsVersion']:
                     payload['_snipeit_os_version_9'] = device['OsVersion']
 
-                if 'ou' in device and asset['custom_fields']['OU']['value']:
+                if '_snipeit_ou_12' in payload and asset['custom_fields']['OU']['value']:
                     del payload['_snipeit_ou_12']
 
-                if 'ou' in device and asset['custom_fields']['Domain']['value']:
+                if '_snipeit_domain_11' in payload and asset['custom_fields']['Domain']['value']:
                     del payload['_snipeit_domain_11']
             except (KeyError, ValueError):
                 logging.error(f"Error: {name} has incorrect custom fields.")

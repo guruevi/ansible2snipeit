@@ -153,8 +153,6 @@ for entry in tree.findall('atom:entry', namespaces):
     model_id = get_snipe_model_id(model, manufacturer, "computer")
     payload = {"name": computer_name,
                "model_id": model_id,
-               "status_id": 2,
-               "category_id": 2,
                '_snipeit_ram_2': round(int(memory) / 1024),
                '_snipeit_operating_system_8': operating_system,
                "_snipeit_management_40": "SCCM"}
@@ -209,6 +207,9 @@ for entry in tree.findall('atom:entry', namespaces):
         if ip_addresses:
             payload['_snipeit_ip_address_13'] = ip_addresses[0]
 
+        payload["status_id"] = 2
+        payload["category_id"] = 2
+
         asset = create_snipe_asset(payload)
     elif snipe_asset['total'] == 1:
         asset = snipe_asset['rows'][0]
@@ -217,6 +218,10 @@ for entry in tree.findall('atom:entry', namespaces):
             payload['_snipeit_ip_address_13'] = ip_addresses[0]
 
         payload = fill_macfields(asset, payload, mac_addresses)
+        if asset['status_label']['id'] == 1:
+            payload["status_id"] = 2
+
+        if ou and not asset['_snipeit_ou_12']:
 
         # If we have a different serial number, we matched on MAC, create a new asset
         if 'serial' in payload and str(asset['serial']).upper() != payload['serial'].upper():
