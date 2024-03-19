@@ -1,238 +1,302 @@
 #!/usr/bin/env python3
-# Open XML file
 from __future__ import annotations
 
-import html
-import ipaddress
-from datetime import datetime
+import copy
 import logging
 import os
-import xml.etree.ElementTree as ElementTree
-from typing import Dict, Any
+from configparser import RawConfigParser
+from datetime import datetime
 
-import requests
+from requests import get
 from requests_ntlm import HttpNtlmAuth
-from ansible2snipe import (get_snipe_model_id, get_snipe_asset, clean_tag, create_snipe_asset, update_snipe_asset,
-                           checkout_snipe_asset, USER_ARGS, CONFIG, clean_mac, clean_manufacturer, fill_macfields,
-                           validate_ip)
-import xmltodict
+from xmltodict import parse
+
+from snipeit_api.api import SnipeITApi
+from snipeit_api.defaults import DEFAULTS
+from snipeit_api.helpers import clean_ip, clean_mac, filter_list, clean_tag, clean_user, print_progress
+from snipeit_api.models import Hardware, Manufacturers, Models, Users
+
+logging.basicConfig(level=logging.INFO)
+CONFIG = RawConfigParser()
+logging.debug("Checking for a settings.conf ...")
+CONFIG.read("settings.conf")
+snipeit_apiurl = CONFIG.get('snipe-it', 'url')
+snipeit_apikey = CONFIG.get('snipe-it', 'apikey')
+# Get the techs from the config file
+DEFAULTS['techs'] = CONFIG.get('snipe-it', 'techs').split(" ")
+
+snipe_api = SnipeITApi(url=snipeit_apiurl, api_key=snipeit_apikey)
+
+
+def download_report(url, dest, auth_config=None):
+    with open(dest, 'wb') as filedesc:
+        dl = get(url, auth=auth_config)
+        for chunk in dl.iter_content(chunk_size=512 * 1024):
+            if chunk:  # filter out keep-alive new chunks
+                filedesc.write(chunk)
+
+
+def get_str(key, props):
+    if key not in props or not props[key]:
+        return ""
+    if type(props[key]) is str or type(props[key]) is int:
+        return str(props[key])
+    if type(props[key]) is dict and "#text" in props[key]:
+        return props[key]["#text"]
+    return ""
+
+
+def get_int(key, props):
+    if key not in props or not props[key]:
+        return 0
+    if type(props[key]) is dict:
+        if "#text" in props[key]:
+            return parse_int(props[key]["#text"])
+        # typically this is m:null="true"
+        return 0
+    return parse_int(props[key])
+
+
+def parse_int(value):
+    try:
+        return int(value)
+    except ValueError:
+        return 0
+
 
 # Stat file
 try:
-    report_stat = os.stat("report.xml")
+    report_stat = os.stat("./tmp/report_pc.xml")
 except FileNotFoundError:
     report_stat = None
 
-if not report_stat or (datetime.now().timestamp() - report_stat.st_mtime) > 86400:
+if (not report_stat or
+        (datetime.now().timestamp() - report_stat.st_mtime) > CONFIG.get('sccm', 'max_age', fallback=86400)):
     # Get report
-    report1 = CONFIG['sccm']['report1']
-    report2 = CONFIG['sccm']['report2']
-    auth = HttpNtlmAuth(CONFIG['sccm']['username'], CONFIG['sccm']['password'])
+    report_pc = CONFIG.get('sccm', 'report_computers')
+    report_net = CONFIG.get('sccm', 'report_network')
+    report_edr = CONFIG.get('sccm', 'report_edr')
+    auth = HttpNtlmAuth(CONFIG.get('sccm', 'username'), CONFIG.get('sccm', 'password'))
 
-    f1 = open("report.xml", 'wb')
-    r1 = requests.get(report1, auth=auth)
-    for chunk in r1.iter_content(chunk_size=512 * 1024):
-        if chunk:  # filter out keep-alive new chunks
-            f1.write(chunk)
-    f1.close()
     # Get XML from response
-
-    f2 = open("report2.xml", 'wb')
-    r2 = requests.get(report2, auth=auth)
-    for chunk in r2.iter_content(chunk_size=512 * 1024):
-        if chunk:  # filter out keep-alive new chunks
-            f2.write(chunk)
-    f2.close()
+    download_report(report_pc, "./tmp/report_pc.xml", auth)
+    download_report(report_net, "./tmp/report_net.xml", auth)
+    download_report(report_edr, "./tmp/report_edr.xml", auth)
 
 # Open XML file
-tree = ElementTree.parse("report.xml")
-with open('report2.xml') as fd:
-    network_doc = xmltodict.parse(fd.read())
+with open('./tmp/report_pc.xml') as fd:
+    pc_doc = parse(fd.read())
+with open('./tmp/report_net.xml') as fd:
+    net_doc = parse(fd.read())
+with open('./tmp/report_edr.xml') as fd:
+    edr_doc = parse(fd.read())
 
-NETWORK_INFO = network_doc['feed']['entry']
+PC_INFO = pc_doc['feed']['entry']
+NET_XML = net_doc['feed']['entry']
+EDR_XML = edr_doc['feed']['entry']
+NET_INFO = {}
+EDR_INFO = {}
+# Convert NET_INFO into a dictionary of computer name -> ip, mac
+for net_item in NET_XML:
+    computer_name = get_str('d:Details_Table0_ComputerName', net_item['content']['m:properties']).split('.')[0]
+    serial = get_str('d:Details_Table0_SerialNumber', net_item['content']['m:properties'])
+    ip = clean_ip(net_item['content']['m:properties']['d:IP_Address'])
+    mac = clean_mac(net_item['content']['m:properties']['d:MAC_Address'])
+    computer_serial = computer_name + serial
+    if computer_name not in NET_INFO:
+        NET_INFO[computer_serial] = {'ip': [], 'mac': []}
+    if ip:
+        NET_INFO[computer_serial]['ip'].append(ip)
+    if mac:
+        NET_INFO[computer_serial]['mac'].append(mac)
+for edr_item in EDR_XML:
+    computer_name = edr_item['content']['m:properties']['d:Details_Table0_Netbios_Name0']
+    if computer_name not in EDR_INFO:
+        EDR_INFO[computer_name] = []
+    EDR_INFO[computer_name] = ["CrowdStrike Falcon"]
 
-
-def find_network_info(name) -> (list[str], list[str]):
-    all_mac = []
-    all_ip = []
-    for xmlentry in NETWORK_INFO:
-        this_computer = xmlentry['content']['m:properties']['d:Details_Table0_ComputerName']
-        if this_computer.upper() == name.upper():
-            ip = validate_ip(xmlentry['content']['m:properties']['d:IP_Address'])
-            mac = clean_mac(xmlentry['content']['m:properties']['d:MAC_Address'])
-            if ip:
-                all_ip.append(str(ip))
-            if mac:
-                all_mac.append(mac)
-    return all_mac, all_ip
-
-
-namespaces = {'m': 'http://schemas.microsoft.com/ado/2007/08/dataservices/metadata',
-              'd': 'http://schemas.microsoft.com/ado/2007/08/dataservices',
-              'atom': 'http://www.w3.org/2005/Atom'}
-
+print_progress(curr_pc := 0, total_pc := len(PC_INFO))
 # For each entry tag
-for entry in tree.findall('atom:entry', namespaces):
-    # Get the content tag
-    content = entry.find('atom:content', namespaces)
-    updated = entry.find('atom:updated', namespaces).text
-    # Parse 2023-10-07T13:21:09Z into datetime
-    updated = datetime.strptime(updated, "%Y-%m-%dT%H:%M:%SZ")
+for entry in PC_INFO:
+    updated = datetime.strptime(entry['updated'], "%Y-%m-%dT%H:%M:%SZ")
+    # Get the properties
+    properties = entry['content']['m:properties']
+    asset_tag = clean_tag(get_str('d:Details_Table0_AssetTag', properties))
+    if len(asset_tag) < 4:
+        asset_tag = ""
+    # Sometimes it is a FQDN, otherwise it is just computer
+    computer_name = get_str('d:Details_Table0_ComputerName', properties).split('.')[0]
+    serial_number = get_str('d:Details_Table0_SerialNumber', properties)
+    computer_serial = computer_name + serial_number
+    if len(computer_name) < 4:
+        logging.warning(f"Skipping {computer_name} due to short name")
+        continue
+    if computer_serial not in NET_INFO or not NET_INFO[computer_serial]:
+        logging.warning(f"Skipping {computer_name} due to no network information")
+        continue
+    if not NET_INFO[computer_serial]['mac'] and not serial_number:
+        logging.warning(f"Skipping {computer_name} due to no MAC or serial number")
+        continue
+    if computer_name not in EDR_INFO or not EDR_INFO[computer_name]:
+        EDR_INFO[computer_name] = []
 
-    properties = content.find('m:properties', namespaces)
-    # Example
-    # <content device_type="application/xml">
-    # 	<m:properties>
-    # 		<d:CollectionID>UOR00B7C</d:CollectionID>
-    # 		<d:Details_Table0_ResourceID m:device_type="Edm.Int32">16897059</d:Details_Table0_ResourceID>
-    # 		<d:Details_Table0_ComputerName>ABCD123</d:Details_Table0_ComputerName>
-    # 		<d:Details_Table0_DomainWorkgroup>DOMAIN</d:Details_Table0_DomainWorkgroup>
-    # 		<d:Details_Table0_OU>domain/ou/ou/ou</d:Details_Table0_OU>
-    # 		<d:Details_Table0_SMSSiteName>SMS Site Name</d:Details_Table0_SMSSiteName>
-    # 		<d:Details_Table0_TopConsoleUser>Unknown</d:Details_Table0_TopConsoleUser>
-    # 		<d:Details_Table0_OperatingSystem>Microsoft Windows 10 Enterprise</d:Details_Table0_OperatingSystem>
-    # 		<d:Details_Table0_ServicePackLevel m:null="true" />
-    # 		<d:Details_Table0_SerialNumber>SSS123S</d:Details_Table0_SerialNumber>
-    # 		<d:Details_Table0_AssetTag></d:Details_Table0_AssetTag>
-    # 		<d:Details_Table0_Manufacturer>Dell Inc.</d:Details_Table0_Manufacturer>
-    # 		<d:Details_Table0_Model>Latitude 3450</d:Details_Table0_Model>
-    # 		<d:Details_Table0_BIOS>A06</d:Details_Table0_BIOS>
-    # 		<d:Details_Table0_MemoryKBytes m:device_type="Edm.Int64">8294148</d:Details_Table0_MemoryKBytes>
-    # 		<d:Processor_Name>Intel(R) Core(TM) i5-5300U CPU @ 2.30GHz</d:Processor_Name>
-    # 		<d:Details_Table0_ProcessorGHz m:device_type="Edm.Int32">2300</d:Details_Table0_ProcessorGHz>
-    # 		<d:Processor_Max_Clock_Speed m:device_type="Edm.Int32">2301</d:Processor_Max_Clock_Speed>
-    # 		<d:Details_Table0_DiskSpaceMB m:device_type="Edm.Int64">237302</d:Details_Table0_DiskSpaceMB>
-    # 		<d:Details_Table0_FreeDiskSpaceMB m:device_type="Edm.Int64">156451</d:Details_Table0_FreeDiskSpaceMB>
-    # 	</m:properties>
-    # </content>
-    # Get Details_Table0_ResourceID
-    # Get Details_Table0_SerialNumber
-    serial_number = clean_tag(properties.find('d:Details_Table0_SerialNumber', namespaces).text)
-    resourceid = properties.find('d:Details_Table0_ResourceID', namespaces).text
+    domain = get_str('d:Details_Table0_DomainWorkgroup', properties).split('.')[0]
+    last_user = clean_user(get_str('d:Details_Table0_TopConsoleUser', properties))
+    os = get_str('d:Details_Table0_OperatingSystem', properties).replace("Microsoft ", "")
+    os_build = get_str('d:Details_Table0_ServicePackLevel', properties)
+    model_name = get_str('d:Details_Table0_Model', properties).replace("Dell System ", "").replace("Dell ", "")
 
-    # Get Details_Table0_ComputerName
-    computer_name = properties.find('d:Details_Table0_ComputerName', namespaces).text
-    computer_name = computer_name.split('.')[0].upper()
-
-    # Get Details_Table0_Domain
-    domain = properties.find(
-        'd:Details_Table0_DomainWorkgroup', namespaces).text
-    # Get Details_Table0_OU, strip off the hostname
-    ou_raw = properties.find('d:Details_Table0_OU', namespaces).text
-
-    ou = ""
-    if ou_raw:
-        ou_parts = ou_raw.split("/")
-        ou = "/".join(ou_parts[0:-1])
-    # Get Details_Table0_TopConsoleUser
-    top_console_user = properties.find(
-        'd:Details_Table0_TopConsoleUser', namespaces).text
-    # Get Details_Table0_OperatingSystem
-    operating_system = properties.find(
-        'd:Details_Table0_OperatingSystem', namespaces).text.replace("Microsoft ", "")
-    # Get Details_Table0_ServicePackLevel
-    service_pack_level = properties.find(
-        'd:Details_Table0_ServicePackLevel', namespaces).text
-
-    # Get Details_Table0_AssetTag
-    asset_tag = clean_tag(properties.find('d:Details_Table0_AssetTag', namespaces).text)
-    # Get Details_Table0_Manufacturer
-    manufacturer = clean_manufacturer(properties.find('d:Details_Table0_Manufacturer', namespaces).text)
-    # Get Details_Table0_Model
-    model = clean_tag(properties.find('d:Details_Table0_Model', namespaces).text)
-
-    memory = properties.find('d:Details_Table0_MemoryKBytes', namespaces).text or 0
-    # Get Processor_Name
-    processor_name = properties.find('d:Processor_Name', namespaces).text
-    # Get Details_Table0_DiskSpaceMB
-    disk_space = properties.find('d:Details_Table0_DiskSpaceMB', namespaces).text
-
-    if model and 'Dell' in model:
-        model = model.replace("Dell System ", "").replace("Dell ", "")
-
-    model_id = get_snipe_model_id(model, manufacturer, "computer")
-    payload = {"name": computer_name,
-               "model_id": model_id,
-               "status_id": 2,
-               "category_id": 2,
-               '_snipeit_ram_2': round(int(memory) / 1024),
-               '_snipeit_operating_system_8': operating_system,
-               "_snipeit_management_40": "SCCM"}
-
-    if serial_number and serial_number.upper() != model.upper():
-        payload["serial"] = serial_number.upper()
-    else:
-        serial_number = f"SCCM-{resourceid}"
-
-    if asset_tag and asset_tag.upper() != model.upper():
-        payload['asset_tag'] = asset_tag.upper()
-    else:
-        asset_tag = f"SCCM-{computer_name}"
-
-    # Custom fields
-    if service_pack_level:
-        payload['_snipeit_os_version_9'] = service_pack_level
-
-    # Make sure domain is valid
-    if domain and (domain.isalnum() or domain.replace("-", "").replace("_", "").isalnum()):
-        payload['_snipeit_domain_11'] = domain
-
+    NET_INFO[computer_serial]['mac'].sort()
+    ip_address = ""
+    if NET_INFO[computer_serial]['ip']:
+        ip_address = sorted(NET_INFO[computer_serial]['ip'])[0]
+    # Remove the last part of the string after the /
+    ou = get_str('d:Details_Table0_OU', properties).lower().replace('.rochester.edu', '')
     if ou:
-        payload['_snipeit_ou_12'] = ou
-    if disk_space:
-        payload['_snipeit_storage_3'] = disk_space
-    if processor_name:
-        payload['_snipeit_cpu_name_14'] = processor_name
-    if top_console_user and top_console_user != "Unknown":
-        payload['_snipeit_console_user_39'] = top_console_user
+        ou = "/".join(ou.split("/")[:-1])
 
-    # Get network info
-    (mac_addresses, ip_addresses) = find_network_info(computer_name)
-    # Sometimes we have duplicates
-    mac_addresses = list(set(mac_addresses))
-    ip_addresses = list(set(ip_addresses))
-    # SCCM can have duplicate names
-    snipe_asset = get_snipe_asset(serial=serial_number,
-                                  mac_addresses=mac_addresses,
-                                  asset_tag=asset_tag)
+    model_config = {
+        "manufacturer_id": DEFAULTS['manufacturer_id'],
+        "category_id": DEFAULTS['category_id'],
+        "fieldset_id": DEFAULTS['fieldset_id'],
+        "eol": 0
+    }
+    # Mapping from SCCM (key) to Snipe-IT custom fields
+    asset_config_nonauth = {
+        "status_id": DEFAULTS['status_id_deployed'],
+        "asset_tag": asset_tag or get_str('d:Details_Table0_ResourceID', properties),
+        "_snipeit_ip_address_5": ip_address,
+    }
+    asset_config_auth = {
+        "_snipeit_org_unit_26": ou,
+        "_snipeit_os_type_17": "Windows" if "Windows" in os else "",
+        "_snipeit_operating_system_14": os,
+        "_snipeit_os_build_16": os_build,
+        "_snipeit_cpu_18": get_str('d:Processor_Name', properties),
+        "serial": serial_number,
+    }
 
-    if not snipe_asset['total']:
-        # If serial number is not found, we don't want to update an existing asset
-        # Serial number is required for Snipe-IT asset creation (not update)
-        if 'serial' not in payload:
-            payload['serial'] = serial_number
+    # Remove empty values
+    asset_config_nonauth = {k: v for k, v in asset_config_nonauth.items() if v}
+    asset_config_auth = {k: v for k, v in asset_config_auth.items() if v}
 
-        if 'asset_tag' not in payload:
-            payload['asset_tag'] = asset_tag
+    model_config['category_id'] = 3 if "server" in os.lower() else 2
 
-        payload = fill_macfields({}, payload, mac_addresses)
-        if ip_addresses:
-            payload['_snipeit_ip_address_13'] = ip_addresses[0]
+    mfg_name = get_str('d:Details_Table0_Manufacturer', properties)
+    manufacturer = Manufacturers(api=snipe_api, name=mfg_name).get_by_name().create()
+    if 'dell' in mfg_name.lower():
+        model_config['eol'] = 60  # 5 years
+    if 'lenovo' in mfg_name.lower():
+        model_config['eol'] = 36  # 3 years
+    if 'hp' in mfg_name.lower():
+        model_config['eol'] = 36  # 3 years
+    if 'apple' in mfg_name.lower():
+        model_config['eol'] = 84  # 7 years
 
-        asset = create_snipe_asset(payload)
-    elif snipe_asset['total'] == 1:
-        asset = snipe_asset['rows'][0]
+    model_config['manufacturer_id'] = manufacturer.id
 
-        if ip_addresses and asset['custom_fields']['IP Address']['value'] not in ip_addresses:
-            payload['_snipeit_ip_address_13'] = ip_addresses[0]
+    model = Models(api=snipe_api, name=model_name).get_by_name().populate(model_config).create()
+    asset_config_auth['model_id'] = model.id or DEFAULTS['model_id']
 
-        payload = fill_macfields(asset, payload, mac_addresses)
+    assert asset_config_auth['model_id'] != 0
 
-        # If we have a different serial number, we matched on MAC, create a new asset
-        if 'serial' in payload and str(asset['serial']).upper() != payload['serial'].upper():
-            asset = create_snipe_asset(payload)
-        else:
-            update_time = asset['updated_at']['datetime']
-            # Convert to datetime object
-            update_time = datetime.strptime(update_time, '%Y-%m-%d %H:%M:%S')
+    new_hw = (Hardware(api=snipe_api,
+                       asset_tag=asset_config_nonauth['asset_tag'],
+                       name=computer_name,
+                       serial=serial_number,
+                       model_id=model.id,
+                       custom_fields=copy.deepcopy(DEFAULTS['custom_fields']))
+              .populate(asset_config_nonauth)
+              .get_by_assettag()
+              .get_by_serial()
+              .get_by_mac(filter_list(NET_INFO[computer_serial]['mac']))
+              .store_state())
 
-            if update_time >= updated and not USER_ARGS.force:
-                logging.info(f"Skipping update for {asset['id']} because the Snipe record is newer.")
-                continue
-            asset = update_snipe_asset(asset, payload)
-    else:
-        logging.error(f"Multiple assets found for {computer_name}")
+    if new_hw.serial and clean_tag(serial_number) and new_hw.serial != serial_number:
+        # We likely matched on a duplicate MAC address but the serial number is different
+        logging.error(f"Serial number mismatch for {computer_name}: {new_hw.serial} != {serial_number}")
+        print(filter_list(NET_INFO[computer_serial]['mac']))
         continue
 
-    if (USER_ARGS.users or USER_ARGS.users_force) and top_console_user:
-        checkout_snipe_asset(top_console_user, asset)
+    # Populate all the custom fields
+    new_hw.populate(asset_config_auth).populate_mac(filter_list(NET_INFO[computer_serial]['mac']))
+
+    # Storage and RAM sometimes fluctuate after upgrades, pick the bigger one if a value already exists
+    new_storage = get_int('d:Details_Table0_DiskSpaceMB', properties)
+    if new_hw.get_custom_field("Storage"):
+        current_storage = parse_int(new_hw.get_custom_field("Storage"))
+        if current_storage < new_storage:
+            new_hw.set_custom_field("Storage", new_storage)
+    else:
+        new_hw.set_custom_field("Storage", new_storage)
+
+    new_ram = round(get_int('d:Details_Table0_MemoryKBytes', properties) / 1024)
+    if new_hw.get_custom_field("RAM"):
+        current_ram = parse_int(new_hw.get_custom_field("RAM"))
+        if current_ram < new_ram:
+            new_hw.set_custom_field("RAM", new_ram)
+    else:
+        new_hw.set_custom_field("RAM", new_ram)
+
+    # Amend domain
+    old_domain = []
+    if new_hw.get_custom_field("Domain"):
+        old_domain = new_hw.get_custom_field("Domain").split(", ")
+    new_domain = []
+    if domain:  # Sometimes it is empty
+        new_domain = [domain.upper()]
+    new_hw.set_custom_field("Domain", ", ".join(filter_list(new_domain + old_domain)))
+    domain = new_hw.get_custom_field("Domain")
+
+    # We are always deployed (SCCM)
+    if new_hw.status_id == DEFAULTS['status_id_pending'] and 'UR' in domain:
+        new_hw.status_id = DEFAULTS['status_id_deployed']
+    if 'UR' in domain and 'research' in ou.lower():
+        # 4 is Research (Compliant)
+        new_hw.status_id = 4
+    elif 'research' in ou.lower() or 'CTCC' in domain or 'HEART' in domain:
+        # 5 is Research (Non-Compliant)
+        new_hw.status_id = 5
+
+    management = ['SCCM']
+    if 'UR' in domain:
+        management.append('AD')
+    old_management = new_hw.get_custom_field("Management")
+    if not old_management:
+        # Filter list to remove empty, duplicate values and sort in order
+        new_hw.set_custom_field("Management", ', '.join(filter_list(management)))
+    else:
+        old_management_list = old_management.split(", ")
+        # Add the new values to the old values
+        new_hw.set_custom_field("Management", ', '.join(filter_list(old_management_list + management)))
+
+    if not new_hw.get_custom_field("EDR"):
+        new_hw.set_custom_field("EDR", ", ".join(EDR_INFO[computer_name]))
+    else:
+        # Add the new values to the old values
+        new_hw.set_custom_field("EDR", ', '.join(
+            filter_list(new_hw.get_custom_field("EDR").split(", ") + EDR_INFO[computer_name])))
+
+    logging.debug(new_hw.to_dict() | new_hw.get_custom_fields())
+
+    # Make sure to filter out the unknowns but maintain the domain
+    if last_user:
+        # Set the raw value for last user
+        new_hw.set_custom_field("Last User", last_user)
+        # Users will strip the domain
+        user = Users(api=snipe_api, username=last_user).get_by_username()
+        if user.id:
+            if user.department and not new_hw.get_custom_field("Department"):
+                new_hw.set_custom_field("Department", user.department.name)
+            if user.department not in DEFAULTS['techs'] and user.username not in DEFAULTS['techs']:
+                if new_hw.status_id == DEFAULTS['status_id_deployed'] or new_hw.status_id == 4:
+                    try:
+                        new_hw.upsert().checkout_to_user(user, note="From SCCM")
+                    except ValueError:
+                        logging.error(f"Failed to check out {new_hw.name} to {user.username}")
+            # If we have an empty department, then update it
+
+    # Putting it here avoids the duplicate calls when we have a user
+    new_hw.upsert()
+    print_progress(curr_pc, total_pc)
+    curr_pc += 1

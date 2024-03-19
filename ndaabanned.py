@@ -3,8 +3,20 @@
 
 # Search SnipeIT for NDAA banned devices
 # This will get a list of systems matching a MAC address prefix and put them into Snipe-IT as "need-to-audit" assets.
+import logging
+from configparser import RawConfigParser
 
-from ansible2snipe import snipe_api_call
+from snipeit_api.api import SnipeITApi
+
+logging.basicConfig(level=logging.INFO)
+CONFIG = RawConfigParser()
+logging.debug("Checking for a settings.conf ...")
+CONFIG.read("settings.conf")
+snipeit_apiurl = CONFIG.get('snipe-it', 'url')
+snipeit_apikey = CONFIG.get('snipe-it', 'apikey')
+
+snipe_api = SnipeITApi(url=snipeit_apiurl, api_key=snipeit_apikey)
+
 
 # ZTE MAC prefix
 zte_mac_prefix = ['00:15:EB',
@@ -2246,7 +2258,7 @@ dahua_mac_prefix = ['08:ED:ED',  # Zhejiang Dahua Technology Co., Ltd.
 mac_prefix_list = zte_mac_prefix + huawei_mac_prefix + hytera_mac_prefix + hangzhou_mac_prefix + dahua_mac_prefix
 
 for mac_prefix in mac_prefix_list:
-    data = snipe_api_call('hardware', {'search': mac_prefix})
+    data = snipe_api.call('hardware', {'search': mac_prefix})
     for result in data['rows']:
         for custom_field in result['custom_fields'].values():
             if custom_field['field_format'] != "MAC" or not custom_field['value']:

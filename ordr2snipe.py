@@ -7,9 +7,12 @@ import os
 from requests import get
 from requests.auth import HTTPBasicAuth
 import logging
-from ansible2snipe import (CONFIG, clean_manufacturer, clean_tag, get_snipe_model_id, get_snipe_asset,
-                           update_snipe_asset, create_snipe_asset, clean_mac, clean_os, fill_macfields)
+from configparser import RawConfigParser
+from snipeit_api.helpers import clean_manufacturer, clean_mac, clean_tag, clean_os
 
+CONFIG = RawConfigParser()
+logging.debug("Checking for a settings.conf ...")
+CONFIG.read("settings.conf")
 # Get the ORDR API key from CONFIG
 ordr_username = CONFIG.get('ordr', 'username')
 ordr_password = CONFIG.get('ordr', 'password')
