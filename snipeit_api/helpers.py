@@ -379,10 +379,17 @@ def filter_list_first(value: list[Any]) -> Any:
     return value[0] if value else None
 
 
-def clean_user(user: str | None) -> str | None:
-    if not clean_tag(user):
-        return None
-    return str(user).strip().split("\\")[-1]
+def clean_user(user: str) -> str:
+    invalid = ["not available",
+               "default string",
+               "not specified",
+               "null",
+               "none",
+               "empty",
+               "unknown"]
+    if not user or str(user).lower() in invalid:
+        return ''
+    return str(user).strip().split("\\")[-1].lower()
 
 
 def get_os_type(operating_system: str) -> str:

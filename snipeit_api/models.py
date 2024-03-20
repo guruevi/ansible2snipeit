@@ -689,6 +689,10 @@ class Hardware(SnipeDataObject):
         return self
 
     def get_by_assettag(self, asset_tag="") -> Self:
+        if self.id:
+            logging.debug("Already have an ID, no need to search")
+            return self
+
         asset_tag = html.escape(clean_tag(asset_tag).upper() or self.asset_tag)
         if not asset_tag:
             logging.debug("No asset tag set")
