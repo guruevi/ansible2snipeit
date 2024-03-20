@@ -310,6 +310,9 @@ def main():
                   .populate(asset)
                   .populate_mac(raw_macs))
 
+        if new_hw.status_id == DEFAULTS['status_id_pending']:
+            new_hw.status_id = DEFAULTS['status_id_deployed']
+
         purchase_cost = purchasing.get('purchasePrice', 0)
         if not new_hw.purchase_cost and purchase_cost:
             setattr(new_hw, 'purchase_cost', purchase_cost)
@@ -392,6 +395,7 @@ def main():
         new_hw.upsert()
         print_progress(current, total)
         current += 1
+
 
 if __name__ == "__main__":
     main()
