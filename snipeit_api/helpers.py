@@ -2,10 +2,18 @@ from __future__ import annotations
 
 import logging
 import re
+import smtplib
 from datetime import date, timedelta
+from email import encoders
+from email.mime.base import MIMEBase
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from os import path
 
 from typing import Any
 from json import dumps as json_stringify
+
+from snipeit_api.defaults import DEFAULTS
 
 
 def clean_tag(value: Any) -> str:
@@ -236,22 +244,22 @@ def clean_manufacturer(manufacturer: str):
     return clean_tag(manufacturer)
 
 
-def clean_mac(mac_address: str) -> str | None:
+def clean_mac(mac_address: str) -> str:
     if not mac_address:
-        return None
+        return ''
     # Remove everything that is not a hex character
     mac_address = ''.join(c for c in mac_address.upper() if c in '0123456789ABCDEF')
     # Invalid MAC
     if not mac_address or len(mac_address) != 12:
-        return None
+        return ''
 
     # Random MAC addresses x2, x6, xA, xE are reserved for local use
     # This catches Microsoft Loopback, VirtualBox, GlobalProtect and Apple Private addresses
     if mac_address[1] in ['2', '6', 'A', 'E']:
-        return None
+        return ''
 
     if mac_address == '000000000000' or mac_address == 'FFFFFFFFFFFF':
-        return None
+        return ''
 
     # Bad MAC addresses, typically due to being USB dongles
     # 000000 -> Xerox (not invalid)
@@ -279,14 +287,15 @@ def clean_mac(mac_address: str) -> str | None:
         'AC7F3EE6DDE5',
         # Microsoft USB dongles?
         'F01DBCF2',
-        # ASIX USB dongles?
-        'F8E43B5B',
+        # ASIX USB dongles
+        'F8E43B',
         # BizLink (Kunshan) USB dongles
         '9CEBE8',
         # Speed Dragon Multimedia USB dongle
         '00133B',
-        # AuKey (Kingtron) USB dongles
+        # AuKey (Dongguan Kingtron Electronics Tech Co., Ltd) USB dongles
         '98FC84E',
+        '34298F7',
         #  Wistron Infocomm (Zhongshan) Corporation dongle
         '98EECBB21088',
         # OmniKey RFID dongle virtual MAC
@@ -301,6 +310,8 @@ def clean_mac(mac_address: str) -> str | None:
         '605B3021',
         'C025A5ED7191',
         '3C2C30F82A34',
+        # Luxshare Precision Industry Company Limited
+        '3C18A0',
         # Tp-Link Technologies Co.,Ltd.
         '984827',
         '34E894',
@@ -308,8 +319,11 @@ def clean_mac(mac_address: str) -> str | None:
         'B44BD62',
         # Shenzhen Century Xinyang Technology Co., Ltd
         '90DE80',
-        #  Good Way Ind. Co., Ltd.
+        # Good Way Ind. Co., Ltd.
         "0050B6",
+        # TRENDnet, Inc.
+        "782D7E"
+
     ]
     # :11 is /28
     if (mac_address in bad_prefix or
@@ -317,7 +331,7 @@ def clean_mac(mac_address: str) -> str | None:
             mac_address[:7] in bad_prefix or
             mac_address[:6] in bad_prefix or
             mac_address[:5] in bad_prefix):
-        return None
+        return ''
 
     # Add colons
     mac_address = ':'.join(mac_address[i:i + 2] for i in range(0, 12, 2))
@@ -432,48 +446,22 @@ def get_os_type(operating_system: str) -> str:
     return ""
 
 
-def validate_os(operating_system: str) -> str | None:
-    # Check if the OS is in the list of valid OSes
-    valid_os = ["AlmaLinux", "Android", "Android 6", "Android 7", "APC AOS", "Axis OS", "BSD", "CentOS",
-                "C Executive OS", "ChromeOS 13020.97", "Cisco IOS", "Cisco IOS Software",
-                "Cisco IOS Software [Bengaluru]", "Cisco IOS Software [Cupertino]", "Cisco IOS Software [Denali]",
-                "Cisco IOS Software [Dublin]", "Cisco IOS Software [Everest]", "Cisco IOS Software [Fuji]",
-                "Cisco IOS Software [Gibraltar]", "Cisco IOS XE", "Cisco NX-OS", "CoBos", "CollabOS", "Debian", "DSM",
-                "Embedded Linux", "Embedded Windows 7", "ENEA OSE 4.5.2", "Evolution OS", "Fedora", "Fire OS",
-                "FortiOS", "FreeBSD", "HELiOS", "HP FutureSmart", "HP ProCurve", "iOS", "IOS XE", "JunOS", "Link-OS",
-                "Linux", "Linux Embedded OS", "Linux Embedded RTOS", "Linux Yocto", "macOS", "Mac OS X", "Meraki OS",
-                "OpenVMS", "OS X", "PAN-OS", "Pump OS", "QNX RTOS", "QTS", "RedHat", "RHEL 7.9", "Ricoh-OS", "RokuOS",
-                "SonicOS", "SRS", "SUSE", "TC7", "Telium2", "Tizen", "Total Access 924e (2nd Gen),", "tvOS", "Ubuntu",
-                "Uniform-OS", "VxWorks", "watchOS", "webOS", "Windows", "Windows 7", "Windows 7 Enterprise",
-                "Windows 7 Professional", "Windows 7 Ultimate", "Windows 8", "Windows 8.1", "Windows 8.1 Pro",
-                "Windows 10", "Windows 10 Education", "Windows 10 Enterprise", "Windows 10 Enterprise 2015 LTSB",
-                "Windows 10 Enterprise 2016 LTSB", "Windows 10 Enterprise LTSC", "Windows 10 Enterprise N",
-                "Windows 10 IoT Enterprise", "Windows 10 IoT Enterprise LTSC", "Windows 10 Pro",
-                "Windows 10 Pro for Workstations", "Windows 11", "Windows 11 Enterprise",
-                "Windows 11 Enterprise multi-session", "Windows 11 Enterprise N", "Windows 11 Pro",
-                "Windows 11 Pro for Workstations", "Windows 2000", "Windows CE", "Windows Embedded Standard",
-                "Windows Server 2008", "Windows Server 2008 R2 Standard", "Windows Server 2012 R2",
-                "Windows Server 2012 R2 Datacenter", "Windows Server 2012 R2 Standard", "Windows Server 2012 Standard",
-                "Windows Server 2016", "Windows Server 2016 Datacenter", "Windows Server 2016 Standard",
-                "Windows Server 2019", "Windows Server 2019 Datacenter", "Windows Server 2019 Standard",
-                "Windows Server 2022", "Windows Server 2022 Datacenter", "Windows Server 2022 Standard",
-                "Windows Storage Server 2012 R2 Standard", "Windows Storage Server 2012 R2 Workgroup",
-                "Windows Storage Server 2016 Standard", "Windows Storage Server 2016 Workgroup", "Windows XP",
-                "Windows XP 64bit", "Windows XP Professional"]
+def validate_os(operating_system: str, valid_os: list = None) -> str:
+    operating_system = clean_os(operating_system)
+    if not valid_os:
+        valid_os = DEFAULTS['valid_os']
 
     if operating_system in valid_os:
         return operating_system
 
-    return None
+    return ""
 
 
-def validate_category(category: str) -> str:
+def validate_category(category: str, valid_categories: list = None) -> str:
     if not category:
         return ""
-    category = category.lower()
-    valid_categories = ["Control", "Process", "Hospital Information System", "Conference Rooms", "Clinical Lab",
-                        "Building Management", "Imaging", "Clinical IoT", "Network", "Surgery", "Physical Security",
-                        "Communication", "Mobile Devices", "Patient Devices", "General IoT", "Servers", "Computers"]
+    if not valid_categories:
+        valid_categories = DEFAULTS['valid_categories']
     if category in valid_categories:
         return category
     return ""
@@ -536,3 +524,53 @@ def query_apple_warranty(serial, model_name=''):
         return year_time
 
     return date(year=year, month=1, day=1)
+
+
+def validate_hostname(hostname) -> str:
+    if not hostname:
+        return ''
+    hostname = str(hostname).strip().upper()
+    # Regular expression pattern for a valid short hostname or FQDN
+    short_hostname_pattern = r"^(?!-)[A-Za-z0-9-]{1,63}(?<!-)$"
+    fqdn_pattern = r"^(?=[a-zA-Z0-9-]{1,63}\.)([a-zA-Z0-9-]{1,63}\.?)+([a-zA-Z]{2,63})$"
+    short_hostname_regex = re.compile(short_hostname_pattern)
+    fqdn_regex = re.compile(fqdn_pattern)
+
+    # Check if the name matches the patterns
+    if short_hostname_regex.match(hostname):
+        return hostname
+    elif fqdn_regex.match(hostname):
+        return hostname.split('.')[0]
+    else:
+        return ''
+
+
+def send_email(recipient_email, subject, body, sender_email,
+               server: str = 'localhost', server_port: int = 25, attachment_path: str = ''):
+    # Create a multipart message
+    msg = MIMEMultipart()
+    msg['From'] = sender_email
+    msg['To'] = recipient_email
+    msg['Subject'] = subject
+
+    # Add body to email
+    msg.attach(MIMEText(body, 'plain'))
+
+    # Attach log file
+    if attachment_path:
+        with open(attachment_path, 'rb') as attachment:
+            part = MIMEBase('application', 'octet-stream')
+            part.set_payload(attachment.read())
+            encoders.encode_base64(part)
+            part.add_header('Content-Disposition', f'attachment; filename= {attachment_path.split(path.sep)[-1]}')
+
+    msg.attach(part)
+
+    # Connect to the SMTP server
+    server = smtplib.SMTP(server, server_port)
+    # Send email
+    text = msg.as_string()
+    server.sendmail(sender_email, recipient_email, text)
+
+    # Close the connection
+    server.quit()
