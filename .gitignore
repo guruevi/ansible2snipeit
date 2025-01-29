@@ -1,0 +1,8 @@
+/settings.conf
+*.xml
+*.csv
+*.txt
+/ips.txt
+/tmp
+/venv
+/.venv
