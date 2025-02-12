@@ -17,9 +17,8 @@ from snipeit_api.helpers import clean_ip, clean_mac, filter_list, clean_tag, cle
     get_dept_from_ou, validate_os
 from snipeit_api.models import Hardware, Manufacturers, Models
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 CONFIG = RawConfigParser()
-logging.debug("Checking for a settings.conf ...")
 CONFIG.read("settings.conf")
 snipeit_apiurl = CONFIG.get('snipe-it', 'url')
 snipeit_apikey = CONFIG.get('snipe-it', 'apikey')
@@ -213,7 +212,7 @@ def main():
     edr_info = process_edr_info(load_xml('./tmp/report_edr.xml'))
     total_entries = len(pc_info)
     completed_entries = 0
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         futures = [executor.submit(process_entry, entry, net_info, edr_info, snipe_api) for entry in pc_info]
         for future in concurrent.futures.as_completed(futures):
             try:
