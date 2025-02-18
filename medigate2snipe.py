@@ -184,9 +184,9 @@ while offset <= count:
             "_snipeit_os_version_15": device['os_version'],
             "_snipeit_os_build_16": device['os_revision'],
             "_snipeit_domain_11": (', '.join(filter_list(device['domains']))).replace(".ROCHESTER.EDU", ""),
+            "_snipeit_os_type_17": device['os_category'],
         }
         asset_config_auth = {
-            "_snipeit_os_type_17": device['os_category'],
             "_snipeit_ip_address_5": clean_ip(filter_list_first(device['ip_list']).split("/")[0]),
             "_snipeit_switches_6": ', '.join(filter_list(device["switch_group_name_list"])),
             "_snipeit_switch_port_7": ', '.join(filter_list(device["switch_port_list"])),

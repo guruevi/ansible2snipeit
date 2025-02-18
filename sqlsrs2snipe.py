@@ -115,7 +115,7 @@ def process_entry(entry, net_info, edr_info, snipe_api):
         "_snipeit_ip_address_5": ip_address,
     }
     asset_config_auth = {
-        "_snipeit_os_type_17": "Windows" if "Windows" in operating_system else "",
+        "_snipeit_os_type_17": "Windows",
         "_snipeit_operating_system_14": validate_os(operating_system),
         "_snipeit_os_build_16": os_build,
         "_snipeit_cpu_18": get_str('d:Processor_Name', properties),
