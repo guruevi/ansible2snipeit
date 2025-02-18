@@ -184,7 +184,6 @@ while offset <= count:
             "_snipeit_os_version_15": device['os_version'],
             "_snipeit_os_build_16": device['os_revision'],
             "_snipeit_domain_11": (', '.join(filter_list(device['domains']))).replace(".ROCHESTER.EDU", ""),
-            "_snipeit_os_type_17": device['os_category'],
         }
         asset_config_auth = {
             "_snipeit_ip_address_5": clean_ip(filter_list_first(device['ip_list']).split("/")[0]),
@@ -254,6 +253,10 @@ while offset <= count:
 
         # Populate all the custom fields
         new_hw.populate(asset_config_auth).populate_mac(device['mac_list'])
+
+        # Override the OS type only if it is currently set to "Other" or empty
+        if not new_hw.get_custom_field("OS Type") or new_hw.get_custom_field("OS Type") == "Other":
+            new_hw.set_custom_field("OS Type", device['os_category'])
 
         # Amend domain
         old_domain = []
