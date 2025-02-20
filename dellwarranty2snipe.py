@@ -12,7 +12,11 @@ from snipeit_api.models import Manufacturers, Models
 
 # Give it a list of Dell serials
 # It will return a dict with { "serial": { "purchase_date": "YYYY-MM-DD", "warranty_months": 12 } }
-def get_dell_warranty(serials: list, manufacturer_id: int, snipeapi: SnipeITApi, api: DellApi) -> dict[str, dict]:
+def get_dell_warranty(serials: list, manufacturer_id: int, snipeapi: SnipeITApi, api: None | DellApi) \
+        -> dict[str, dict]:
+    if not api:
+        api = DellApi()
+
     try:
         dell_warranties = api.asset_warranty(serials)
     except JSONDecodeError:
@@ -77,10 +81,9 @@ def get_dell_warranty(serials: list, manufacturer_id: int, snipeapi: SnipeITApi,
 
 def main():
     dell_api = DellApi()
-    config = RawConfigParser()
     logging.basicConfig(level=logging.ERROR)
 
-    logging.debug("Checking for a settings.conf ...")
+    config = RawConfigParser()
     config.read("settings.conf")
     snipeit_apiurl = config.get('snipe-it', 'url')
     snipeit_apikey = config.get('snipe-it', 'apikey')

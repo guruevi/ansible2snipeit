@@ -34,6 +34,7 @@ from typing import Iterable
 
 from jinja2.nativetypes import NativeEnvironment
 
+from dellwarranty2snipe import get_dell_warranty
 from snipeit_api.api import SnipeITApi
 from snipeit_api.defaults import DEFAULTS
 from snipeit_api.helpers import filter_list, get_dept_from_ou, clean_edr, validate_os
@@ -195,6 +196,14 @@ def main():
         filter_list(new_hw.get_custom_field("EDR").split(", ") + [clean_edr(edr)])))
 
     logging.debug(new_hw.to_dict() | new_hw.get_custom_fields())
+
+    if "dell" in manufacturer.lower() and not new_hw.purchase_date:
+        warranty = get_dell_warranty([serial], manufacturer.id, snipeapi=api)
+        # Returns: "{ "serial": { "purchase_date": "YYYY-MM-DD", "warranty_months": 12 } }"
+        logging.debug(warranty)
+        if serial in warranty:
+            new_hw.purchase_date = warranty[serial]['purchase_date']
+            new_hw.warranty_months = warranty[serial]['warranty_months']
 
     if org_unit:
         new_hw.set_custom_field("Org. Unit", org_unit)
