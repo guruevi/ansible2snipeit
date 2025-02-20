@@ -135,7 +135,7 @@ def main():
     serial = get_os_config_value(os, 'serial', ansible_data)
     asset_tag = get_os_config_value(os, 'asset_tag', ansible_data)
     model = get_os_config_value(os, 'model', ansible_data)
-    manufacturer = get_os_config_value(os, 'manufacturer', ansible_data)
+    manufacturer_str = get_os_config_value(os, 'manufacturer', ansible_data)
     mac_addresses = get_os_config_value(os, 'mac_addresses', ansible_data)
     os_type = get_os_config_value(os, 'os_type', ansible_data)
     operating_system = get_os_config_value(os, 'operating_system', ansible_data)
@@ -154,7 +154,7 @@ def main():
         logging.error(f"No valid asset_tag, serial, or mac found for {computer_name}. Skipping.")
         return
 
-    manufacturer = Manufacturers(api=api, name=manufacturer).get_by_name().create()
+    manufacturer = Manufacturers(api=api, name=manufacturer_str).get_by_name().create()
     model_data = {"manufacturer_id": manufacturer.id, "name": model}
     model = Models(api=api, category_id=DEFAULTS['category_id'], fieldset_id=DEFAULTS['fieldset_id']).get_by_name(
         model).populate(model_data).create()
@@ -197,7 +197,7 @@ def main():
 
     logging.debug(new_hw.to_dict() | new_hw.get_custom_fields())
 
-    if "dell" in manufacturer.lower() and not new_hw.purchase_date:
+    if "dell" in manufacturer_str.lower() and not new_hw.purchase_date:
         warranty = get_dell_warranty([serial], manufacturer.id, snipeapi=api)
         # Returns: "{ "serial": { "purchase_date": "YYYY-MM-DD", "warranty_months": 12 } }"
         logging.debug(warranty)
