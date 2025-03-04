@@ -172,9 +172,9 @@ def main():
                        serial=serial,
                        custom_fields=copy.deepcopy(DEFAULTS['custom_fields'])
                        )
-              .get_by_asset_tag()
               .get_by_serial()
               .get_by_mac(mac_addresses)
+              .get_by_asset_tag()
               .get_by_name()
               .store_state()
               .populate(hardware_data)
