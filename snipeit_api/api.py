@@ -11,7 +11,7 @@ from requests_cache import CachedSession
 session = CachedSession(
     'snipeit_cache',  # Use a custom cache dir
     backend='memory',  # Use an in-memory cache
-    expire_after=timedelta(days=1),  # Cache for 1 day
+    expire_after=timedelta(hours=1),  # Cache for 1 day
     allowable_codes=[200],  # Cache only successful responses
     allowable_methods=['GET']  # Cache only GET requests
 )
