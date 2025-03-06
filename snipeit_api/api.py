@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from http.client import RemoteDisconnected
 from sys import exit
 from datetime import timedelta
 from time import sleep
@@ -135,7 +136,10 @@ class SnipeITApi:
             exit(2)
         self.snipe_backoff += 1
         sleep(self.snipe_backoff_seconds * self.snipe_backoff)
-        return self.call(endpoint, payload, method)
+        try:
+            return self.call(endpoint, payload, method)
+        except ConnectionError:
+            return self._handle_connection_error(endpoint, payload, method)
 
     def _reset_backoff(self) -> None:
         if self.snipe_backoff > 0:
