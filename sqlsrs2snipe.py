@@ -89,8 +89,7 @@ def process_edr_info(edr_xml):
     return edr_info
 
 
-def process_entry(entry, net_info, edr_info, snipe_api):
-    properties = entry['content']['m:properties']
+def process_entry(properties, net_info, edr_info, api: SnipeITApi):
     computer_name = get_str('d:Details_Table0_ComputerName', properties).split('.')[0].upper()
     serial_number = get_str('d:Details_Table0_SerialNumber', properties).upper()
     computer_serial = computer_name + serial_number
@@ -133,16 +132,16 @@ def process_entry(entry, net_info, edr_info, snipe_api):
     }
 
     mfg_name = get_str('d:Details_Table0_Manufacturer', properties)
-    manufacturer = Manufacturers(api=snipe_api, name=mfg_name).get_by_name().create()
+    manufacturer = Manufacturers(api=api, name=mfg_name).get_by_name().create()
     model_config[
         'eol'] = 60 if 'dell' in mfg_name.lower() else 36 if 'lenovo' in mfg_name.lower() or 'hp' in mfg_name.lower() else 84 if 'apple' in mfg_name.lower() else 0
     model_config['manufacturer_id'] = manufacturer.id
 
-    model = Models(api=snipe_api, name=model_name).get_by_name().populate(model_config).create()
+    model = Models(api=api, name=model_name).get_by_name().populate(model_config).create()
     asset_config_auth['model_id'] = model.id or DEFAULTS['model_id']
     assert asset_config_auth['model_id'] != 0
 
-    new_hw = (Hardware(api=snipe_api,
+    new_hw = (Hardware(api=api,
                        asset_tag=asset_config_nonauth['asset_tag'],
                        name=computer_name,
                        serial=serial_number,
@@ -212,15 +211,10 @@ def main():
     edr_info = process_edr_info(load_xml('./tmp/report_edr.xml'))
     total_entries = len(pc_info)
     completed_entries = 0
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-        futures = [executor.submit(process_entry, entry, net_info, edr_info, snipe_api) for entry in pc_info]
-        for future in concurrent.futures.as_completed(futures):
-            try:
-                future.result()
-                completed_entries += 1
-                print_progress(completed_entries, total_entries)
-            except Exception as e:
-                logging.error(f"Error processing entry: {e}")
+    for entry in pc_info:
+        process_entry(entry['content']['m:properties'], net_info, edr_info, snipe_api)
+        completed_entries += 1
+        print_progress(completed_entries, total_entries)
 
 
 if __name__ == "__main__":
