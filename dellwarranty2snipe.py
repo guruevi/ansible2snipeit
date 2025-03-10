@@ -93,7 +93,7 @@ def main():
     alienware_manufacturer = Manufacturers(api=snipeapi).get_by_name("Alienware")
     unknown_manufacturer = Manufacturers(api=snipeapi).get_by_name("Unknown")
 
-    for manufacturer in [unknown_manufacturer, dell_manufacturer, alienware_manufacturer]:
+    for manufacturer in [dell_manufacturer, alienware_manufacturer, unknown_manufacturer]:
         offset = 0
         limit = 99  # Limit on the Dell API
         total = 0
@@ -106,6 +106,7 @@ def main():
             # Serials_id is a dict with { "serial": "snipeid" }
             serials_id = {}
             for asset in pages['rows']:
+                logging.debug(asset)
                 serial = asset['serial'].lower()
                 if len(serial) != 7:
                     logging.warning(f"Invalid serial {serial} in {asset['name']}")
