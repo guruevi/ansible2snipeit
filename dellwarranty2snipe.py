@@ -12,7 +12,7 @@ from snipeit_api.models import Manufacturers, Models
 
 # Give it a list of Dell serials
 # It will return a dict with { "serial": { "purchase_date": "YYYY-MM-DD", "warranty_months": 12 } }
-def get_dell_warranty(serials: list, manufacturer_id: int, snipeapi: SnipeITApi, api: None | DellApi) \
+def get_dell_warranty(serials: list, manufacturer_id: int, snipeapi: SnipeITApi, api: DellApi|None = None) \
         -> dict[str, dict]:
     if not api:
         api = DellApi()
