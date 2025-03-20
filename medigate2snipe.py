@@ -12,7 +12,7 @@ from medigate_api.rest import ApiException
 from snipeit_api.defaults import DEFAULTS
 from snipeit_api.api import SnipeITApi
 from snipeit_api.helpers import filter_list, filter_list_str, filter_list_first, clean_ip, clean_tag, print_progress, \
-    clean_user, clean_edr
+    clean_user, clean_edr, clean_mac
 from snipeit_api.models import Hardware, Models, Category, Manufacturers, FieldSets, Users
 
 logging.basicConfig(level=logging.INFO)
@@ -194,13 +194,16 @@ while offset <= count:
             "_snipeit_vlan_name_10": ', '.join(filter_list(device["vlan_name_list"])),
         }
         # Apply clean_mac function to device['mac_list']
-        mac_addresses = filter_list([clean_tag(mac) for mac in device['mac_list']])
+        mac_addresses = filter_list([clean_mac(mac) for mac in device['mac_list']])
         serial_number = clean_tag(device['serial_number'])
 
         if not mac_addresses and not serial_number:
             logging.error(
                 f"No valid serial number or MAC address found for {device['device_name']}."
-                f"Cannot uniquely identify asset.")
+                f"Cannot uniquely identify asset."
+                f"{device['mac_list']}"
+                f"{device['serial_number']}"
+            )
             continue
 
         # Remove empty values
@@ -241,14 +244,14 @@ while offset <= count:
 
         new_hw = (Hardware(api=snipe_api,
                            asset_tag=device['asset_id'] or device['uid'],
-                           name=hostname,
                            serial=serial_number,
+                           name=hostname,
                            model_id=asset_config_nonauth['model_id'],
                            custom_fields=copy.deepcopy(DEFAULTS['custom_fields']))
                   .populate(asset_config_nonauth)
+                  .get_by_asset_tag()
                   .get_by_serial()
                   .get_by_mac(device['mac_list'])
-                  .get_by_asset_tag()
                   .get_by_name()
                   .store_state())
 

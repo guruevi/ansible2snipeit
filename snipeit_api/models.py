@@ -332,40 +332,25 @@ class Models(SnipeDataObject):
         super().__setattr__(key, value)
 
     def get_by_name(self, name: str = "") -> Self:
-        if self.id:
-            logging.debug("Already have an ID, no need to search")
-            return self
         name = html.escape(clean_tag(name) or self.name)
 
         if not name:
             name = "Unknown"
 
-        data = self.api.call(f'models?search={name}')
-        if 'total' in data:
-            for row in data['rows']:
-                if row['name'].upper() == name.upper() or row['model_number'].upper() == name.upper():
-                    return self.populate(row, from_api=True)
+        self.search('models', {"name": name})
+        self.search('models', {"model_number": name})
 
-        logging.debug(f"No matching model found")
         return self
 
     def get_by_model_number(self, model_number: str = "") -> Self:
-        if self.id:
-            logging.debug("Already have an ID, no need to search")
-            return self
-        model_number = clean_tag(model_number) or self.model_number
+        model_number_clean = html.escape(clean_tag(model_number) or self.model_number)
 
-        if not model_number:
-            logging.debug(f"No model number set")
-            return self
+        if not model_number_clean:
+            model_number_clean = "Unknown"
 
-        data = self.api.call(f'models?search={model_number}')
-        if 'total' in data:
-            for row in data['rows']:
-                if row['model_number'].upper() == model_number.upper() or row['name'].upper() == model_number.upper():
-                    return self.populate(row, from_api=True)
+        self.search('models', {"model_number": model_number_clean})
+        self.search('models', {"name": model_number_clean})
 
-        logging.debug(f"No matching model number found, trying model name")
         return self
 
 
@@ -581,9 +566,9 @@ class Hardware(SnipeDataObject):
         logging.debug(f"Hardware: Setting {key} to {value} of type {type(value)}")
 
         if key == 'name':
-            value: str = value.upper()
+            value: str = clean_tag(value).upper()
             if not value:
-                value = "Unknown"
+                value = self.asset_tag or self.serial or "Unknown"
 
         if key == 'asset_tag':
             value: str = clean_tag(value).upper()
@@ -687,32 +672,24 @@ class Hardware(SnipeDataObject):
         return custom_fields
 
     def get_by_name(self, name: str = "") -> Self:
-        name = html.escape(clean_tag(name).upper() or self.name)
+        name = clean_tag(html.escape(name)).upper() or self.name or self.asset_tag or self.serial or "Unknown"
         if not name:
             logging.debug("Name not set")
             return self
 
-        # Hardware does not implement name matching
-        data = self.api.call(f'hardware?search={name}')
-        if 'total' in data:
-            for row in data['rows']:
-                if row['name'].upper() == name:
-                    return self.populate(row, from_api=True)
-        logging.debug(f"No matching hardware found")
-        return self
+        return self.search(f'hardware?filter={{"name":"{name}"}}')
 
     def get_by_mac(self, mac_addresses: list | None = None, remove_bad_vendors: bool = False) -> Self:
-        if self.id:
-            logging.debug("Already have an ID, no need to search")
-            return self
-
         if mac_addresses is None:
             mac_addresses = []
 
+        fields_to_query = []
         # If we added MAC addresses some other way, then we want to also add them to the list
         for cf in self.custom_fields.values():
-            if cf['field_format'] == 'MAC' and cf['value']:
-                mac_addresses.append(cf['value'].upper())
+            if cf['field_format'] == 'MAC':
+                fields_to_query.append(cf['field'])
+                if cf['value']:
+                    mac_addresses.append(cf['value'].upper())
 
         # Filter out empty and duplicates
         mac_addresses = filter_list(mac_addresses)
@@ -720,37 +697,26 @@ class Hardware(SnipeDataObject):
         for mac_address in mac_addresses:
             # Search implementation will return nothing on empty string
             if clean_mac(mac_address, remove_bad_vendors=remove_bad_vendors):
-                self.search('hardware', payload={"search": mac_address.upper()})
+                for custom_field in fields_to_query:
+                    self.search(f'hardware?filter={{"{custom_field}":"{mac_address}"}}')
 
         return self
 
     def get_by_asset_tag(self, asset_tag="") -> Self:
-        if self.id:
-            logging.debug("Already have an ID, no need to search")
-            return self
-
-        asset_tag = html.escape(clean_tag(asset_tag).upper() or self.asset_tag)
+        asset_tag_clean = html.escape(clean_tag(asset_tag).upper() or self.asset_tag)
         if not asset_tag:
-            logging.debug("No asset tag set")
+            logging.debug(f"No valid asset tag: {asset_tag}")
             return self
 
-        data = self.api.call(f"hardware/bytag/{asset_tag}")
-        if 'id' in data:
-            return self.populate(data, from_api=True)
-        logging.debug(f"No matching hardware found")
-        return self
+        return self.search(f"hardware/bytag/{asset_tag_clean}")
 
     def get_by_serial(self, serial="") -> Self:
-        if self.id:
-            logging.debug("Already have an ID, no need to search")
+        serial_clean = clean_tag(serial).upper() if serial else self.serial
+        if not serial_clean:
+            logging.debug(f"No valid serial number {serial}")
             return self
 
-        serial = clean_tag(serial).upper() if serial else self.serial
-        if not serial:
-            logging.debug("No serial number set")
-            return self
-
-        return self.search(f"hardware/byserial/{serial}")
+        return self.search(f"hardware/byserial/{serial_clean}")
 
     def checkout_to_user(self, user: Users, expected_checkin: str = "", checkout_at: str = "", note: str = "") -> Self:
         if not user.id:
