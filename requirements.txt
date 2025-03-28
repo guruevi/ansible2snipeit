@@ -10,7 +10,7 @@ openpyxl==3.1.4
 oracledb==2.2.1
 typing~=3.7.4.3
 typing_extensions~=4.10.0
-requests~=2.31.0
+requests~=2.32.3
 dnspython~=2.6.1
 requests-ntlm~=1.2.0
 xmltodict~=0.13.0
