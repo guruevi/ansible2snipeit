@@ -30,8 +30,10 @@ import copy
 import logging
 from configparser import RawConfigParser
 from json import loads as json_str_to_dict
+from os import getenv
 from typing import Iterable
 
+from flask import Flask, request, jsonify
 from jinja2.nativetypes import NativeEnvironment
 
 from dellwarranty2snipe import get_dell_warranty
@@ -40,10 +42,21 @@ from snipeit_api.defaults import DEFAULTS
 from snipeit_api.helpers import filter_list, get_dept_from_ou, clean_edr, validate_os
 from snipeit_api.models import Hardware, Manufacturers, Models
 
-version = "0.1"
+version = "0.2"
 CONFIG = RawConfigParser()
 logging.basicConfig(level=logging.ERROR)
+# Find a valid settings.conf file.
+CONFIG.read("settings.conf")
+if 'snipe-it' not in set(CONFIG):
+    logging.debug("No valid CONFIG found in current folder.")
+    logging.error(
+        "No valid settings.conf was found. We'll need to quit while you figure out where the settings are at. "
+        "You can check the README for valid locations.")
+    raise SystemExit("Error: No valid settings.conf - Exiting.")
 
+api = SnipeITApi(url=CONFIG['snipe-it']['url'],
+                 api_key=CONFIG['snipe-it']['apikey'])
+app = Flask(__name__)
 
 def get_os_config_value(os: str, config_key: str, data: dict, invalid_values: list | None = None):
     return get_config_value(CONFIG[f"{os}-api-mapping"].get(config_key, None), data, invalid_values)
@@ -103,24 +116,25 @@ def extract_api_mapping(os: str, asset_data: Iterable) -> dict:
             return_dict[snipekey] = value
     return return_dict
 
+@app.route('/', methods=['GET'])
+def health_check():
+    return jsonify({"message": "Service is running"}), 200
+@app.route('/', methods=['POST'])
+def receive_data():
+    if not request.is_json:
+        return jsonify({"message": "Request must be JSON"}), 400
+
+    data = request.get_json()
+    parse_ansible_data(data)
+    return jsonify({"message": "Data received", "data": data}), 200
 
 def main():
-    # Find a valid settings.conf file.
-    CONFIG.read("settings.conf")
-    if 'snipe-it' not in set(CONFIG):
-        logging.debug("No valid CONFIG found in current folder.")
-        logging.error(
-            "No valid settings.conf was found. We'll need to quit while you figure out where the settings are at. "
-            "You can check the README for valid locations.")
-        raise SystemExit("Error: No valid settings.conf - Exiting.")
-
-    api = SnipeITApi(url=CONFIG['snipe-it']['url'],
-                     api_key=CONFIG['snipe-it']['apikey'])
-
     # Open STDIN and read the JSON
     with open(0, 'r') as f:
         ansible_json = f.read()
+    return parse_ansible_data(ansible_json)
 
+def parse_ansible_data(ansible_json: str):
     # Parse the JSON
     ansible_data = json_str_to_dict(ansible_json)
     os: str = ansible_data['system']
@@ -226,6 +240,13 @@ def main():
      .set_custom_field("Storage", storage)
      .upsert())
 
+    return new_hw.to_dict()
+
 
 if __name__ == "__main__":
-    main()
+    in_flask = getenv('FLASK_ENV', None)
+    if in_flask:
+        app.run()
+    else:
+        asset_data = main()
+        print(asset_data)
