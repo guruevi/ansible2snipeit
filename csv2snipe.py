@@ -13,8 +13,7 @@ import xlrd
 
 from snipeit_api.api import SnipeITApi
 from snipeit_api.defaults import DEFAULTS
-from snipeit_api.helpers import clean_ip, clean_mac, clean_tag, validate_category, validate_os, get_os_type, \
-    validate_hostname, send_email
+from snipeit_api.helpers import clean_ip, clean_mac, clean_tag, validate_os, get_os_type, validate_hostname
 from snipeit_api.models import Hardware
 
 logging.basicConfig(level=logging.DEBUG)
@@ -45,10 +44,8 @@ def read_csv(file_path: str) -> list:
     output = []
     with open(file_path, 'r') as csv_fd:
         csv_file = reader(csv_fd)
-        row_number = 0
         for line in csv_file:
-            output[row_number] = line
-            row_number += 1
+            output.append(line)
     return output
 
 
@@ -164,10 +161,11 @@ def csv2snipe(file: str) -> str:
 
 
 def main():
+    errors = ''
     for file in listdir(INPUT_DIR):
         if file.endswith(".xls") or file.endswith(".csv") or file.endswith(".xlsx"):
             full_path = path.join(INPUT_DIR, file)
-            errors = csv2snipe(full_path)
+            errors += csv2snipe(full_path)
             if errors:
                 logging.error(f"Errors occurred while processing {file}")
                 logging.debug(errors)
@@ -175,6 +173,9 @@ def main():
             else:
                 logging.info(f"Processed {file} successfully")
                 move(path.join(INPUT_DIR, file), path.join(OUTPUT_DIR, file))
+    # Write log to disk
+    with open(path.join(OUTPUT_DIR, 'import.log'), 'a') as log_fd:
+        log_fd.write(errors)
 
 
 if __name__ == '__main__':
