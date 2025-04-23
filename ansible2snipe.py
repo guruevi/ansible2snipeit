@@ -132,11 +132,12 @@ def main():
     # Open STDIN and read the JSON
     with open(0, 'r') as f:
         ansible_json = f.read()
-    return parse_ansible_data(ansible_json)
-
-def parse_ansible_data(ansible_json: str):
-    # Parse the JSON
     ansible_data = json_str_to_dict(ansible_json)
+
+    return parse_ansible_data(ansible_data)
+
+def parse_ansible_data(ansible_data: dict):
+    # Parse the JSON
     os: str = ansible_data['system']
     logging.info(f"Starting to update {os} inventory.")
     # Get category
