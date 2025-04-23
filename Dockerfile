@@ -20,7 +20,10 @@ COPY . .
 RUN rm -f /app/settings.conf
 RUN rm -rf /app/venv
 RUN mkdir /app_settings
+# This if for our App
 RUN ln -s /app_settings/settings.conf /app/settings.conf
+# Dell API seems to have this hardcoded
+RUN ln -s /app_settings/settings.conf /root/secrets.ini
 
 # Expose the Flask app port and settings file
 EXPOSE 5000
