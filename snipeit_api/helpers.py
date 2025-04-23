@@ -455,10 +455,22 @@ def clean_user(user: str) -> str:
                "null",
                "none",
                "empty",
-               "unknown"]
-    if not user or str(user).lower() in invalid:
+               "unknown",
+               "root",
+               "system"]
+    # Make sure user is str
+    user = str(user).strip().lower()
+    if not user or user in invalid:
         return ''
-    return str(user).strip().split("\\")[-1].lower()
+    if "scanner" in user or "admin" in user:
+        return ''
+    # If @ in user or \\ in user, strip domain
+    if "@" in user:
+        user = user.split('@')[0]
+    if "\\" in user:
+        user = user.split("\\")[-1]
+
+    return user
 
 
 def get_os_type(operating_system: str) -> str:
