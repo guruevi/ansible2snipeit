@@ -167,7 +167,7 @@ def parse_ansible_data(ansible_data: dict):
 
     if not asset_tag and not serial and not mac_addresses:
         logging.error(f"No valid asset_tag, serial, or mac found for {computer_name}. Skipping.")
-        return
+        return None
 
     manufacturer = Manufacturers(api=api, name=manufacturer_str).get_by_name().create()
     model_data = {"manufacturer_id": manufacturer.id, "name": model}
@@ -194,6 +194,21 @@ def parse_ansible_data(ansible_data: dict):
               .store_state()
               .populate(hardware_data)
               .populate_mac(mac_addresses, remove_bad_vendor=False))
+
+    if not new_hw.serial:
+        # If we don't have a serial, use asset tag or else we need to use the first MAC address as the serial
+        if new_hw.asset_tag:
+            new_hw.serial = new_hw.asset_tag
+            logging.warning(f"No serial number found for {computer_name}, using asset tag as serial: {new_hw.serial}")
+        else:
+            new_hw.serial = new_hw.name
+            logging.warning(f"No serial number or asset tag found for {computer_name}, using name as serial: {new_hw.serial}")
+
+    if not new_hw.asset_tag:
+        # If we don't have an asset tag, we can use the serial number or MAC address
+        new_hw.asset_tag = new_hw.serial
+        logging.warning(f"No asset tag found for {computer_name}, using {new_hw.asset_tag} as asset tag.")
+
 
     # Amend domain
     old_domain = new_hw.get_custom_field("Domain").split(", ")

@@ -56,7 +56,7 @@ class SnipeObject:
 
     def to_patch_dict(self, curr_data) -> dict:
         for k, v in self._curr_data.items():
-            if k in curr_data and curr_data[k] == v:
+            if k in curr_data and k != 'id' and curr_data[k] == v:
                 del curr_data[k]
         return curr_data
 

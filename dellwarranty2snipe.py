@@ -20,7 +20,7 @@ def get_dell_warranty(serials: list, manufacturer_id: int, snipeapi: SnipeITApi,
     try:
         dell_warranties = api.asset_warranty(serials)
     except JSONDecodeError:
-        logging.error(f"Invalid key/serial in serial")
+        logging.error(f"Invalid API key or invalid JSON")
         logging.debug(serials)
         return {}
 
