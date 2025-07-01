@@ -111,6 +111,7 @@ offset = 0
 count = 0
 limit = 100
 current = 0
+timeout = 60  # seconds
 
 while offset <= count:
     parameters = GetDevicesParameters.from_dict({
@@ -157,9 +158,11 @@ while offset <= count:
             count = api_response.count
             print(f"Total devices: {count}")
         offset += limit
+        timeout = 60 # Reset timeout on successful API call
     except ApiException as e:
         logging.error("Exception when calling DevicesApi->get_devices: %s\n" % e)
-        sleep(60)  # Sleep for 60 seconds before trying again
+        sleep(timeout)  # Sleep for 60 seconds before trying again
+        timeout *= 2  # Exponential backoff
         continue
     except (ValueError, KeyError):
         logging.error("Error parsing response")

@@ -41,7 +41,7 @@ class SnipeITApi:
         self.url = url
         self.verify_tls = verify_tls
         self.snipe_backoff = 0
-        self.snipe_backoff_seconds = 30
+        self.snipe_backoff_seconds = 60
         self.page_size = page_size
         self.headers = {
             'Authorization': f"Bearer {api_key}",
@@ -100,7 +100,7 @@ class SnipeITApi:
         try:
             response = session.request(method, api_url, auth=None, headers=self.headers, json=payload,
                                        verify=self.verify_tls)
-        except ConnectionError:
+        except (ConnectionError, RemoteDisconnected):
             return self._handle_connection_error(endpoint, payload, method)
 
         if 200 <= response.status_code < 300:
@@ -138,7 +138,7 @@ class SnipeITApi:
         sleep(self.snipe_backoff_seconds * self.snipe_backoff)
         try:
             return self.call(endpoint, payload, method)
-        except ConnectionError:
+        except (ConnectionError, RemoteDisconnected):
             return self._handle_connection_error(endpoint, payload, method)
 
     def _reset_backoff(self) -> None:
