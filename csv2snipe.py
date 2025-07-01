@@ -106,7 +106,7 @@ def csv2snipe(file: str) -> str:
         if not operating_system:
             logging.error(f"Invalid operating system for {name}: {row[9]}, OS will not be set")
             logging.info("Valid operating systems: " + ', '.join(DEFAULTS['valid_os']))
-        os_type = get_os_type(operating_system)
+
         serial = row[2].upper()
         macaddresses = []
         for macaddress in row[4].split(','):
@@ -137,7 +137,7 @@ def csv2snipe(file: str) -> str:
                               status_id=DEFAULTS['status_id_pending']
                               )
                      .set_custom_field("Operating System", operating_system)
-                     .set_custom_field("OS Type", os_type)
+                     .set_custom_field("OS Type", get_os_type(operating_system))
                      .set_custom_field("IP Address", ip)
                      .get_by_serial()
                      .get_by_mac(macaddresses)

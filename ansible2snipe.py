@@ -39,7 +39,7 @@ from jinja2.nativetypes import NativeEnvironment
 from dellwarranty2snipe import get_dell_warranty
 from snipeit_api.api import SnipeITApi
 from snipeit_api.defaults import DEFAULTS
-from snipeit_api.helpers import filter_list, get_dept_from_ou, clean_edr, validate_os
+from snipeit_api.helpers import filter_list, get_dept_from_ou, clean_edr, validate_os, get_os_type
 from snipeit_api.models import Hardware, Manufacturers, Models
 
 version = "0.2"
@@ -239,9 +239,6 @@ def parse_ansible_data(ansible_data: dict):
         new_hw.set_custom_field("Org. Unit", org_unit)
         new_hw.set_custom_field("Department", get_dept_from_ou(org_unit))
 
-    if 'Linux' in os_type:
-        os_type = 'Other'
-
     if current_user:
         new_hw.set_custom_field("Last User", current_user)
 
@@ -249,7 +246,7 @@ def parse_ansible_data(ansible_data: dict):
      .set_custom_field("Operating System", validate_os(operating_system))
      .set_custom_field("OS Version", os_version)
      .set_custom_field("OS Build", os_build)
-     .set_custom_field("OS Type", os_type)
+     .set_custom_field("OS Type", get_os_type(operating_system))
      .set_custom_field("IP Address", ip_address)
      .set_custom_field("RAM", ram)
      .set_custom_field("CPU", cpu)

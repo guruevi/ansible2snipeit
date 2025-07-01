@@ -12,7 +12,7 @@ from medigate_api.rest import ApiException
 from snipeit_api.defaults import DEFAULTS
 from snipeit_api.api import SnipeITApi
 from snipeit_api.helpers import filter_list, filter_list_str, filter_list_first, clean_ip, clean_tag, print_progress, \
-    clean_user, clean_edr, clean_mac
+    clean_user, clean_edr, clean_mac, get_os_type
 from snipeit_api.models import Hardware, Models, Category, Manufacturers, FieldSets, Users
 
 logging.basicConfig(level=logging.INFO)
@@ -260,6 +260,8 @@ while offset <= count:
 
         # Override the OS type only if it is currently set to "Other" or empty
         if not new_hw.get_custom_field("OS Type") or new_hw.get_custom_field("OS Type") == "Other":
+            if device['os_category'] == "Other":
+                device['os_category'] = get_os_type(device['os_category'])
             new_hw.set_custom_field("OS Type", device['os_category'])
 
         # Amend domain
