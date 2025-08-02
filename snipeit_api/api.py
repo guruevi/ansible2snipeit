@@ -6,7 +6,7 @@ from sys import exit
 from datetime import timedelta
 from time import sleep
 from typing import Any
-
+from requests.exceptions import ConnectionError
 from requests_cache import CachedSession
 
 session = CachedSession(
@@ -100,7 +100,7 @@ class SnipeITApi:
         try:
             response = session.request(method, api_url, auth=None, headers=self.headers, json=payload,
                                        verify=self.verify_tls)
-        except (ConnectionError, RemoteDisconnected):
+        except ConnectionError:
             return self._handle_connection_error(endpoint, payload, method)
 
         if 200 <= response.status_code < 300:
@@ -129,16 +129,17 @@ class SnipeITApi:
         return api_url
 
     def _handle_connection_error(self, endpoint: str, payload: Any, method: str) -> Any:
-        logging.error("Connection error, waiting to see if it resolves")
         if self.snipe_backoff > 5:
             logging.error(f"Connection error persists, with {method} to {endpoint} exiting")
             logging.debug(payload)
             exit(2)
         self.snipe_backoff += 1
+        logging.error(f"Retrying {method} to {endpoint} in {self.snipe_backoff_seconds * self.snipe_backoff} seconds")
         sleep(self.snipe_backoff_seconds * self.snipe_backoff)
+        logging.error(f"Retrying {method} to {endpoint}")
         try:
             return self.call(endpoint, payload, method)
-        except (ConnectionError, RemoteDisconnected):
+        except ConnectionError:
             return self._handle_connection_error(endpoint, payload, method)
 
     def _reset_backoff(self) -> None:
