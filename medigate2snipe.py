@@ -2,6 +2,7 @@
 import copy
 import logging
 from configparser import RawConfigParser
+from html import unescape
 from os import getenv
 from time import sleep
 
@@ -11,11 +12,11 @@ from medigate_api.rest import ApiException
 
 from snipeit_api.defaults import DEFAULTS
 from snipeit_api.api import SnipeITApi
-from snipeit_api.helpers import filter_list, filter_list_str, filter_list_first, clean_ip, clean_tag, print_progress, \
+from snipeit_api.helpers import filter_list, filter_list_first, clean_tag, print_progress, \
     clean_user, clean_edr, clean_mac, get_os_type
-from snipeit_api.models import Hardware, Models, Category, Manufacturers, FieldSets, Users
+from snipeit_api.models import Hardware, Models, Category, Manufacturers, FieldSets, Locations
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 CONFIG = RawConfigParser()
 logging.debug("Checking for a settings.conf ...")
 CONFIG.read("settings.conf")
@@ -26,7 +27,7 @@ snipeit_apikey = CONFIG.get('snipe-it', 'apikey')
 # Get the techs from the config file
 DEFAULTS['techs'] = CONFIG.get('snipe-it', 'techs').split(" ")
 # Get number of days from environment variable
-DEFAULTS['days'] = int(getenv('DAYS', 30))  # Default to 30 if not set
+DEFAULTS['days'] = int(getenv('DAYS', 1))  # Default to 1 day if not set
 DEFAULTS['first_or_last'] = getenv('FIRST_OR_LAST', 'last')  # Default to last if not set
 if DEFAULTS['first_or_last'] not in ['first', 'last']:
     DEFAULTS['first_or_last'] = 'last'
@@ -34,11 +35,12 @@ if DEFAULTS['first_or_last'] not in ['first', 'last']:
 DEFAULTS['first_or_last'] = f"{DEFAULTS['first_or_last']}_seen_list"
 
 snipe_api = SnipeITApi(url=snipeit_apiurl, api_key=snipeit_apikey)
+defaultLocationObject = Locations(api=snipe_api, name="Unknown").get_by_name()
 
 fields = [
-    # "ap_location_list",
-    # "ap_name_list",
-    "asset_id",
+    "ap_location_list",
+    "ap_name_list",
+    # "asset_id",
     # "assignees",
     "authentication_user_list",
     # "bssid_list",
@@ -59,7 +61,7 @@ fields = [
     # "hw_version",
     "internet_communication",
     # "ip_assignment_list",
-    "ip_list",
+    # "ip_list",
     "last_domain_user",
     # "last_domain_user_activity",
     # "local_name",
@@ -71,10 +73,10 @@ fields = [
     "manufacturer",
     # "mobility",
     "model",
-    # "network_list",
+    "network_list",
     # "network_scope_list",
     "os_category",
-    "os_eol_date",
+    # "os_eol_date",
     "os_name",
     "os_revision",
     # "os_subcategory",
@@ -84,24 +86,24 @@ fields = [
     # "protocol_location_list",
     # "retired",
     "serial_number",
-    # "site_name",
+    "site_name",
     # "snmp_hostnames",
     # "software_or_firmware_version",
-    "ssid_list",
+    # "ssid_list",
     "switch_group_name_list",
     "switch_port_list",
     "uid",
-    "vlan_list",
-    "vlan_name_list",
+    # "vlan_list",
+    # "vlan_name_list",
     # "windows_hostnames",
     # "windows_last_seen_hostname",
     # "wireless_encryption_type_list",
     # "wlc_location_list",
     # "wlc_name_list",
     # "switch_ip_list",
-    # "switch_location_list",
+    "switch_location_list",
     # "switch_mac_list",
-    # "switch_port_description_list",
+    "switch_port_description_list",
     # "vlan_description_list",
 ]
 
@@ -182,19 +184,16 @@ while offset <= count:
         asset_config_nonauth = {
             "status_id": DEFAULTS['status_id_pending'],
             "model_id": DEFAULTS['model_id'],
-            "_snipeit_last_user_13": clean_user(filter_list_first(device['authentication_user_list'])),
+            "_snipeit_last_user_13": clean_user(filter_list_first(device['authentication_user_list'], [device['last_domain_user']])),
             "_snipeit_operating_system_14": device['os_name'],
             "_snipeit_os_version_15": device['os_version'],
             "_snipeit_os_build_16": device['os_revision'],
             "_snipeit_domain_11": (', '.join(filter_list(device['domains']))).replace(".ROCHESTER.EDU", ""),
         }
         asset_config_auth = {
-            "_snipeit_ip_address_5": clean_ip(filter_list_first(device['ip_list']).split("/")[0]),
-            "_snipeit_switches_6": ', '.join(filter_list(device["switch_group_name_list"])),
-            "_snipeit_switch_port_7": ', '.join(filter_list(device["switch_port_list"])),
-            "_snipeit_ssid_8": ', '.join(filter_list(device["ssid_list"])),
-            "_snipeit_vlan_9": ', '.join(filter_list_str(device["vlan_list"])),
-            "_snipeit_vlan_name_10": ', '.join(filter_list(device["vlan_name_list"])),
+            # "_snipeit_ip_address_5": clean_ip(filter_list_first(device['ip_list']).split("/")[0]),
+            "_snipeit_switches_6": filter_list_first(device["switch_group_name_list"], device["ap_name_list"]),
+            "_snipeit_switch_port_7": ",".join(filter_list(device["switch_port_list"])) + " " + ",".join(filter_list(device["switch_port_description_list"]))
         }
         # Apply clean_mac function to device['mac_list']
         mac_addresses = filter_list([clean_mac(mac) for mac in device['mac_list']])
@@ -232,6 +231,52 @@ while offset <= count:
         asset_config_nonauth['model_id'] = model.id or DEFAULTS['model_id']
         assert asset_config_nonauth['model_id'] != 0
 
+        # Make a location
+        ap_location = filter_list(device['ap_location_list'])
+        switch_location = filter_list(device['switch_location_list'])
+
+
+        if device['site_name']:
+            locationObject = Locations(api=snipe_api, name=clean_tag(device['site_name'])).get_by_name().create()
+            site_id = locationObject.id
+        else:
+            locationObject = defaultLocationObject
+            site_id = 0
+
+        for location_list in [switch_location, ap_location]:
+            if not location_list:
+                continue
+            for location in location_list:
+                location = clean_tag(location.strip())
+                if not location:
+                   continue
+
+                city, state, zipnumber, country = "", "", "", "United States"
+
+                # Parse if the location name is an address
+                address = location.split(',')[0].strip()
+                if len(location.split(',')) > 1:
+                    city = location.split(',')[1].strip()
+                if len(location.split(',')) > 2:
+                    state_zip = location.split(',')[2].strip()
+                    zipnumber = state_zip.split(' ')[-1].strip()
+                    state = ' '.join(state_zip.split(' ')[:-1]).strip()
+
+                if address and len(address) < 3:
+                    continue
+
+                locationObject = Locations(
+                    api=snipe_api,
+                    name=address,
+                    address=address,
+                    city=city,
+                    state=state,
+                    zip=zipnumber,
+                    country=country,
+                    parent_id=site_id
+                ).get_by_name().upsert()
+                # Once we have a location, we can break out of the loop
+
         hostname = filter_list_first(device['dhcp_hostnames']) or device['device_name']
         if not hostname:
             # Get IP address
@@ -246,7 +291,7 @@ while offset <= count:
         hostname = hostname.split(".")[0].upper()
 
         new_hw = (Hardware(api=snipe_api,
-                           asset_tag=device['asset_id'] or device['uid'],
+                           asset_tag=device['uid'],
                            serial=serial_number,
                            name=hostname,
                            model_id=asset_config_nonauth['model_id'],
@@ -260,6 +305,7 @@ while offset <= count:
 
         # Populate all the custom fields
         new_hw.populate(asset_config_auth).populate_mac(device['mac_list'])
+        new_hw.location_id = locationObject.id
 
         # Override the OS type only if it is currently set to "Other" or empty
         if not new_hw.get_custom_field("OS Type") or new_hw.get_custom_field("OS Type") == "Other":
@@ -322,10 +368,6 @@ while offset <= count:
         # If we still have an "Unknown" model, then improve the data (hopefully)
         if device['model'] and new_hw.model_id == DEFAULTS['model_id']:
             asset_config_auth['model_id'] = model.id
-
-        last_user = clean_user(device['last_domain_user'])
-        if last_user and last_user != new_hw.name:
-            new_hw.set_custom_field("Last User", last_user)
 
         try:
             new_hw.upsert()

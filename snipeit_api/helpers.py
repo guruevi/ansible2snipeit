@@ -66,6 +66,8 @@ def clean_tag(value: Any) -> str:
     # + does weird things, % is a wildcard, so it becomes hard to search for something with it
     # " and ' are used to delimit strings and can cause havoc
     value = str(value).replace('+', '').replace('%', '').replace('"', '').replace("'", '').strip()
+    value = value.replace("&amp;", "and").replace("&", "and")  # Snipe-IT cannot search for & in names
+
     value_lower = value.lower()
 
     invalid = ["not available",
@@ -443,10 +445,12 @@ def filter_list_str(value: list[Any]) -> list[str]:
     return value
 
 
-def filter_list_first(value: list[Any]) -> Any:
-    value = filter_list(value)
-    return value[0] if value else None
-
+def filter_list_first(*values: list[Any]) -> Any:
+    for value in values:
+        value = filter_list(value)
+        if len(value):
+            return value[0]
+    return None
 
 def clean_user(user: str) -> str:
     invalid = ["not available",

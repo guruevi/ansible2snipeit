@@ -36,7 +36,7 @@ class Actions:
     clone: bool = False
     checkout: bool = False
     checkin: bool = False
-
+    bulk_selectable: bool = False
 
 @dataclass_json
 @dataclass
@@ -56,7 +56,11 @@ class SnipeObject:
 
     def to_patch_dict(self, curr_data) -> dict:
         for k, v in self._curr_data.items():
-            if k in curr_data and k != 'id' and curr_data[k] == v:
+            if (k in curr_data and k != 'id' and
+                    (curr_data[k] == v or
+                     (isinstance(curr_data[k], str) and html.unescape(curr_data[k]) == html.unescape(v))
+                    )
+            ):
                 del curr_data[k]
         return curr_data
 
@@ -73,6 +77,7 @@ class SnipeObject:
             logging.debug("No changes to save")
             return self
 
+        logging.debug(f"Updating {self.__class__.__name__} with ID {self.id}, data: {curr_data}")
         data = self.api.call(f"{self.__class__.__name__}/{self.id}".lower(), method=method, payload=curr_data)
         if "status" in data and data['status'] == "success" and "payload" in data and data['payload']:
             return self.populate(data['payload'], from_api=True)
@@ -110,7 +115,8 @@ class SnipeObject:
 
     def get_by_name(self, name: str = ""):
         # Connect to the Snipe-IT API and fetch the object
-        name = html.escape(name or self.name)
+        name = name or self.name
+        name.replace("&amp;", "and").replace("&", "and")  # Snipe-IT cannot search for & in names
         if not name:
             name = "Unknown"
 
@@ -133,6 +139,8 @@ class SnipeObject:
 
     def populate(self, data: dict, from_api=False) -> Self:
         for k, v in data.items():
+            if isinstance(v, str):
+                v = html.unescape(v)
             setattr(self, k, v)
         self._populated_from_api = from_api
         return self
@@ -392,7 +400,7 @@ class Departments(SnipeDataObject):
 
 @dataclass_json
 @dataclass
-class Location(SnipeDataObject):
+class Locations(SnipeDataObject):
     image: str = field(metadata=config(exclude=exclude_ifempty), default="")
     address: str = ""
     address2: str = ""
@@ -408,8 +416,10 @@ class Location(SnipeDataObject):
     users_count: int = 0
     currency: str = ""
     ldap_ou: str = ""
-    parent: Location | None = None
-    manager: Users | None = None
+    parent_id: int = field(metadata=config(exclude=exclude_ifempty), default=0)
+    parent: Locations | None = field(metadata=config(exclude=exclude_ifempty), default=None)
+    manager_id: int = field(metadata=config(exclude=exclude_ifempty), default=0)
+    manager: Users | None = field(metadata=config(exclude=exclude_ifempty), default=None)
     # Children are of type Location, but we cannot infinitely recurse
     children: list[dict] = field(metadata=config(exclude=exclude_ifempty), default_factory=list)
 
@@ -466,7 +476,7 @@ class Users(SnipeDataObject):
     email: str = field(metadata=config(exclude=exclude_ifempty), default="")
     department: Departments = field(metadata=config(exclude=exclude_ifempty), default_factory=Departments)
     department_id: int = field(metadata=config(exclude=exclude_ifempty), default=0)
-    location: Location = field(metadata=config(exclude=exclude_ifempty), default_factory=Location)
+    location: Locations = field(metadata=config(exclude=exclude_ifempty), default_factory=Locations)
     notes: str = field(metadata=config(exclude=exclude_ifempty), default="")
     permissions: dict = field(metadata=config(exclude=exclude_ifempty), default_factory=dict)
     activated: bool = True
@@ -537,8 +547,8 @@ class Hardware(SnipeDataObject):
     supplier: Suppliers = field(metadata=config(exclude=exclude_always), default_factory=Suppliers)
     company: Company = field(metadata=config(exclude=exclude_always), default_factory=Company)
     company_id: int = field(metadata=config(exclude=exclude_always), default=0)
-    location: Location = field(metadata=config(exclude=exclude_always), default_factory=Location)
-    rtd_location: Location = field(metadata=config(exclude=exclude_always), default_factory=Location)
+    location: Locations = field(metadata=config(exclude=exclude_always), default_factory=Locations)
+    rtd_location: Locations = field(metadata=config(exclude=exclude_always), default_factory=Locations)
     qr: str = field(metadata=config(exclude=exclude_always), default="")
     alt_barcode: str = field(metadata=config(exclude=exclude_always), default="")
     assigned_to: Users | int = field(metadata=config(exclude=exclude_always), default_factory=Users)

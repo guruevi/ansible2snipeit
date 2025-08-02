@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import copy
-import ipaddress
 from configparser import RawConfigParser
 from os import getenv
 
