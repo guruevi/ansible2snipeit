@@ -2,7 +2,6 @@
 import copy
 import logging
 from configparser import RawConfigParser
-from html import unescape
 from os import getenv
 from time import sleep
 
@@ -26,7 +25,7 @@ snipeit_apiurl = CONFIG.get('snipe-it', 'url')
 snipeit_apikey = CONFIG.get('snipe-it', 'apikey')
 # Get the techs from the config file
 DEFAULTS['techs'] = CONFIG.get('snipe-it', 'techs').split(" ")
-# Get number of days from environment variable
+# Get the number of days from the environment variable
 DEFAULTS['days'] = int(getenv('DAYS', 1))  # Default to 1 day if not set
 DEFAULTS['first_or_last'] = getenv('FIRST_OR_LAST', 'last')  # Default to last if not set
 if DEFAULTS['first_or_last'] not in ['first', 'last']:
@@ -179,7 +178,7 @@ while offset <= count:
             "category_id": DEFAULTS['category_id'],
             "fieldset_id": DEFAULTS['fieldset_id']
         }
-        # Mapping from Medigate (key) to Snipe-IT custom fields (tuple with field name, default value and callable to
+        # Mapping from Claroty xDome (key) to Snipe-IT custom fields (tuple with field name, default value and callable to
         # transform the value)
         asset_config_nonauth = {
             "status_id": DEFAULTS['status_id_pending'],
@@ -272,10 +271,12 @@ while offset <= count:
                     city=city,
                     state=state,
                     zip=zipnumber,
-                    country=country,
-                    parent_id=site_id
-                ).get_by_name().upsert()
+                    country=country
+                ).get_by_name()
                 # Once we have a location, we can break out of the loop
+                if not locationObject.parent_id and site_id != locationObject.id:
+                    locationObject.parent_id = site_id
+                locationObject.upsert()
 
         hostname = filter_list_first(device['dhcp_hostnames']) or device['device_name']
         if not hostname:
