@@ -144,21 +144,6 @@ DEFAULTS = {
             'value': '',
             'field_format': 'ANY',
             'element': 'text'},
-        'SSID': {
-            'field': '_snipeit_ssid_8',
-            'value': '',
-            'field_format': 'ANY',
-            'element': 'text'},
-        'VLAN': {
-            'field': '_snipeit_vlan_9',
-            'value': '',
-            'field_format': 'ANY',
-            'element': 'text'},
-        'VLAN Name': {
-            'field': '_snipeit_vlan_name_10',
-            'value': '',
-            'field_format': 'ANY',
-            'element': 'text'},
         'Domain': {
             'field': '_snipeit_domain_11',
             'value': '',
