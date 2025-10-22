@@ -1,8 +1,7 @@
-# Ansible2SnipeIT
+# ETL for IT
 
-This repository is a hodgepodge of Python scripts that I use to fill and update my Snipe-IT instance with records.
+This repository is a hodgepodge of Python scripts that I use to fill and update Snipe-IT instance with records.
 
-I'm not a professional developer, so I'm sure there are better ways to do some of this stuff. 
 I'm open to suggestions and pull requests.
 
 ## Parts of this repository
@@ -19,7 +18,7 @@ Imports a CSV file into Snipe-IT and creates logs for people to review.
 Uses the Dell Warranty API to update objects in Snipe-IT based on your Dell Service Tags.
 
 ### ldap2snipe.py
-NEEDS REWORKED: Uses LDAP to update OU in Snipe-IT based on your LDAP server.
+Uses LDAP to update OU in Snipe-IT based on your LDAP server.
 
 ### medigate2snipe.py
 Uses the Medigate API to update objects in Snipe-IT based on your Medigate inventory.

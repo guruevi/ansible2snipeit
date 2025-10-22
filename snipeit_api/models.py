@@ -566,10 +566,18 @@ class Hardware(SnipeDataObject):
 
     def set_custom_field(self, human_name: str, value: str) -> Self:
         # This will trigger the custom_fields dict, see __setattr__
+        if human_name not in self.custom_fields:
+            logging.debug(f"Custom field {human_name} not found in this fieldset.")
+            return self
+
         setattr(self, self.custom_fields[human_name]['field'], value)
         return self
 
     def get_custom_field(self, human_name: str) -> str:
+        if human_name not in self.custom_fields:
+            logging.debug(f"Custom field {human_name} not found in this fieldset.")
+            return ''
+
         return getattr(self, self.custom_fields[human_name]['field']) or ''
 
     def __setattr__(self, key, value: str | int | dict):
