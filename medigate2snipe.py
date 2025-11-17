@@ -230,11 +230,6 @@ while offset <= count:
         asset_config_nonauth['model_id'] = model.id or DEFAULTS['model_id']
         assert asset_config_nonauth['model_id'] != 0
 
-        # Make a location
-        ap_location = filter_list(device['ap_location_list'])
-        switch_location = filter_list(device['switch_location_list'])
-
-
         if device['site_name']:
             locationObject = Locations(api=snipe_api, name=clean_tag(device['site_name'])).get_by_name().create()
             site_id = locationObject.id
@@ -242,13 +237,13 @@ while offset <= count:
             locationObject = defaultLocationObject
             site_id = 0
 
+        # Make a location
+        ap_location = filter_list(device['ap_location_list'])
+        switch_location = filter_list(device['switch_location_list'])
+
         for location_list in [switch_location, ap_location]:
-            if not location_list:
-                continue
             for location in location_list:
                 location = clean_tag(location.strip())
-                if not location:
-                   continue
 
                 city, state, zipnumber, country = "", "", "", "United States"
 
@@ -306,7 +301,9 @@ while offset <= count:
 
         # Populate all the custom fields
         new_hw.populate(asset_config_auth).populate_mac(device['mac_list'])
-        new_hw.location_id = locationObject.id
+
+        if not new_hw.location_id:
+            new_hw.location_id = locationObject.id
 
         # Override the OS type only if it is currently set to "Other" or empty
         if not new_hw.get_custom_field("OS Type") or new_hw.get_custom_field("OS Type") == "Other":
