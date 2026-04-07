@@ -15,7 +15,7 @@ from snipeit_api.helpers import filter_list, filter_list_first, clean_tag, print
     clean_user, clean_edr, clean_mac, get_os_type
 from snipeit_api.models import Hardware, Models, Category, Manufacturers, FieldSets, Locations
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.ERROR)
 CONFIG = RawConfigParser()
 logging.debug("Checking for a settings.conf ...")
 CONFIG.read("settings.conf")

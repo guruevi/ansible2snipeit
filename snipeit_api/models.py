@@ -3,6 +3,8 @@ from __future__ import annotations
 import html
 import re
 from dataclasses import dataclass, field, fields
+from uuid import uuid4
+
 from typing_extensions import Self
 
 from dataclasses_json import dataclass_json, config
@@ -73,8 +75,8 @@ class SnipeObject:
         if method == 'PATCH':
             curr_data = self.to_patch_dict(curr_data)
 
-        if not curr_data:
-            logging.debug("No changes to save")
+        if set(curr_data.keys()) == {"id"}:
+            logging.info("No changes to save")
             return self
 
         logging.debug(f"Updating {self.__class__.__name__} with ID {self.id}, data: {curr_data}")
@@ -153,6 +155,9 @@ class SnipeObject:
         dcfields: tuple = fields(self)
         if key == 'status_label':
             key = 'status'
+
+        if key == 'name':
+            value = value.replace("&amp;", "and").replace("&", "and")
 
         if '_id' in key:
             # Make sure to cast as int, the API returns strings
@@ -479,7 +484,7 @@ class Users(SnipeDataObject):
     location: Locations = field(metadata=config(exclude=exclude_ifempty), default_factory=Locations)
     notes: str = field(metadata=config(exclude=exclude_ifempty), default="")
     permissions: dict = field(metadata=config(exclude=exclude_ifempty), default_factory=dict)
-    activated: bool = True
+    activated: bool = False
     autoassign_licenses: bool = field(metadata=config(exclude=exclude_always), default=False)
     ldap_import: bool = field(metadata=config(exclude=exclude_always), default=False)
     two_factor_enrolled: bool = False
@@ -497,11 +502,20 @@ class Users(SnipeDataObject):
     groups: list[dict] | None = field(metadata=config(exclude=exclude_ifempty), default=None)
     employee_number: str = field(metadata=config(exclude=exclude_ifempty), default="")
     type: str = field(metadata=config(exclude=exclude_ifempty), default="")
+    password: str = field(metadata=config(exclude=exclude_ifempty), default="")
+    password_confirmation: str = field(metadata=config(exclude=exclude_ifempty), default="")
 
     def __setattr__(self, key, value):
         if key == 'username':
             value = clean_user(value)
         super().__setattr__(key, value)
+
+    def upsert(self, method="PATCH") -> Self:
+        if not self.id and not self.password:
+            # We are creating a user, set a random password
+            self.password = uuid4().hex
+            self.password_confirmation = self.password
+        return super().upsert(method)
 
     def get_by_username(self, username: str = "") -> Self:
         username = clean_user(username) if username else self.username
@@ -668,7 +682,7 @@ class Hardware(SnipeDataObject):
         if method == 'PATCH':
             curr_data = self.to_patch_dict(curr_data)
 
-        if not curr_data:
+        if set(curr_data.keys()) == {"id"}:
             logging.debug("No changes to save")
             return self
 
