@@ -6,7 +6,6 @@ import logging
 import os
 from configparser import RawConfigParser
 from datetime import datetime
-import concurrent.futures
 from requests import get
 from requests_ntlm import HttpNtlmAuth
 from xmltodict import parse
@@ -154,11 +153,6 @@ def process_entry(properties, net_info, edr_info, api: SnipeITApi):
               .get_by_name()
               .store_state())
 
-    if new_hw.serial and clean_tag(serial_number) and new_hw.serial != serial_number:
-        logging.error(f"Serial number mismatch for {computer_name}: {new_hw.serial} != {serial_number}")
-        logging.error(filter_list(net_info[computer_serial]['mac']))
-        return
-
     new_hw.populate(asset_config_auth).populate_mac(filter_list(net_info[computer_serial]['mac']))
 
     new_storage = get_int('d:Details_Table0_DiskSpaceMB', properties)
@@ -199,8 +193,7 @@ def process_entry(properties, net_info, edr_info, api: SnipeITApi):
 
 def main():
     report_stat = os.stat("./tmp/report_pc.xml") if os.path.exists("./tmp/report_pc.xml") else None
-    if not report_stat or (datetime.now().timestamp() - report_stat.st_mtime) > CONFIG.get('sccm', 'max_age',
-                                                                                           fallback=86400):
+    if not report_stat or (datetime.now().timestamp() - report_stat.st_mtime) > CONFIG.get('sccm', 'max_age',                                                                  fallback=86400):
         auth = HttpNtlmAuth(CONFIG.get('sccm', 'username'), CONFIG.get('sccm', 'password'))
         download_report(CONFIG.get('sccm', 'report_computers'), "./tmp/report_pc.xml", auth)
         download_report(CONFIG.get('sccm', 'report_network'), "./tmp/report_net.xml", auth)

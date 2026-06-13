@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+import json
 import re
 from dataclasses import dataclass, field, fields
 from uuid import uuid4
@@ -135,7 +136,16 @@ class SnipeObject:
         data = self.api.call(endpoint, payload=payload, method=method)
         if 'total' in data:
             if data['total'] > 1:
-                logging.warning(f"More than one result found for {endpoint}, using the first one.")
+                # If the payload has a filter, it does a LIKE match
+                if payload and 'filter' in payload:
+                    # The filter looks like {"field_var":"value"}
+                    payload_filter = json.loads(payload["filter"])
+                    payload_fields = payload_filter.keys()
+                    # Find an exact match for the filter field
+                    for row in data['rows']:
+                        if all(payload_filter[payload_field] == row[payload_field] for payload_field in payload_fields):
+                            return self.populate(row, from_api=True)
+            logging.debug(f"Multiple results found for {endpoint} {payload or ''} - returning the first one")
             if data['total'] > 0:
                 return self.populate(data['rows'][0], from_api=True)
         logging.debug(f"No results found for {endpoint} {payload or ''}")
@@ -713,7 +723,7 @@ class Hardware(SnipeDataObject):
         else:
             name = self.name
 
-        return self.search(f'hardware?filter={{"name":"{name}"}}')
+        return self.search(f'hardware', payload={"filter": '{"name": "' + name + '"}')
 
     def get_by_mac(self, mac_addresses: list | None = None, remove_bad_vendors: bool = False) -> Self:
         if mac_addresses is None:
