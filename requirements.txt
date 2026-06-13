@@ -1,7 +1,7 @@
 annotated-types==0.7.0
 dataclasses-json==0.6.7
 dell-warranty-api==1.10.0
-Flask==3.0.3
+Flask==3.1.3
 medigate-api@ git+https://github.com/guruevi/medigate_api.git@0702dab28d033b08e16704503ac97fb3a86d1470
 pyldap==3.0.0.post1
 requests-cache==1.2.0
