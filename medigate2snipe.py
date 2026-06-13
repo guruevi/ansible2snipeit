@@ -240,15 +240,9 @@ while offset <= count:
         else:
             locationObject = defaultLocationObject
 
-        hostname = filter_list_first(device['dhcp_hostnames']) or device['device_name']
-        if not hostname:
-            # Get IP address
-            hostname = asset_config_auth['_snipeit_ip_address_5']
+        hostname = device['device_name']
         hostname = hostname.split("\\")
-        if len(hostname) > 1:
-            hostname = hostname[1]
-        else:
-            hostname = hostname[0]
+        hostname = hostname[int(len(hostname) > 1)]
 
         # Get canonical name
         hostname = hostname.split(".")[0].upper()
