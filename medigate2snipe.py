@@ -237,46 +237,8 @@ while offset <= count:
 
         if device['site_name']:
             locationObject = Locations(api=snipe_api, name=clean_tag(device['site_name'])).get_by_name().create()
-            site_id = locationObject.id
         else:
             locationObject = defaultLocationObject
-            site_id = 0
-
-        # Make a location
-        ap_location = filter_list(device['ap_location_list'])
-        switch_location = filter_list(device['switch_location_list'])
-
-        for location_list in [switch_location, ap_location]:
-            for location in location_list:
-                location = clean_tag(location.strip())
-
-                city, state, zipnumber, country = "", "", "", "United States"
-
-                # Parse if the location name is an address
-                address = location.split(',')[0].strip()
-                if len(location.split(',')) > 1:
-                    city = location.split(',')[1].strip()
-                if len(location.split(',')) > 2:
-                    state_zip = location.split(',')[2].strip()
-                    zipnumber = state_zip.split(' ')[-1].strip()
-                    state = ' '.join(state_zip.split(' ')[:-1]).strip()
-
-                if address and len(address) < 3:
-                    continue
-
-                locationObject = Locations(
-                    api=snipe_api,
-                    name=address,
-                    address=address,
-                    city=city,
-                    state=state,
-                    zip=zipnumber,
-                    country=country
-                ).get_by_name()
-                # Once we have a location, we can break out of the loop
-                if not locationObject.parent_id and site_id != locationObject.id:
-                    locationObject.parent_id = site_id
-                locationObject.upsert()
 
         hostname = filter_list_first(device['dhcp_hostnames']) or device['device_name']
         if not hostname:
@@ -307,8 +269,8 @@ while offset <= count:
         # Populate all the custom fields
         new_hw.populate(asset_config_auth).populate_mac(device['mac_list'])
 
-        if not new_hw.location_id:
-            new_hw.location_id = locationObject.id
+        # Set location if we have a site name, otherwise set to default location
+        new_hw.location_id = locationObject.id
 
         # Override the OS type only if it is currently set to "Other" or empty
         if not new_hw.get_custom_field("OS Type") or new_hw.get_custom_field("OS Type") == "Other":
@@ -336,22 +298,19 @@ while offset <= count:
 
         # Values are "Yes", "No", "Unidirectional Outbound"
         # Don't overwrite a specific value with a general value
-        if new_hw.get_custom_field("Internet") != "Unidirectional Outbound":
-            # Don't overwrite a yes with a no
-            if new_hw.get_custom_field("Internet") != "Yes":
-                new_hw.set_custom_field("Internet", device['internet_communication'])
-            elif device['internet_communication'] == "Unidirectional Outbound":
-                new_hw.set_custom_field("Internet", "Unidirectional Outbound")
+        new_hw.set_custom_field("Internet", device['internet_communication'])
 
         # Values are "Transmits", "Stores", "Transmits and Stores"
-        if device['phi'] and new_hw.get_custom_field("PHI") != device['phi']:
+        if device['phi']:
             transmit = False
             stores = False
-            new_hw.set_custom_field("PII", "Yes")
             if "Transmits" in new_hw.get_custom_field("PHI") or "Transmits" in device['phi']:
                 transmit = True
             if "Stores" in new_hw.get_custom_field("PHI") or "Stores" in device['phi']:
                 stores = True
+            if transmit or stores:
+                new_hw.set_custom_field("PII", "Yes")
+
             if transmit and stores:
                 new_hw.set_custom_field("PHI", "Transmits, Stores")
             elif transmit:
