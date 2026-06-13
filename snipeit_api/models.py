@@ -706,10 +706,12 @@ class Hardware(SnipeDataObject):
         return custom_fields
 
     def get_by_name(self, name: str = "") -> Self:
-        name = clean_tag(html.escape(name)).upper() or self.name or self.asset_tag or self.serial or "Unknown"
-        if not name:
-            logging.debug("Name not set")
-            return self
+        if name:
+            name = html.escape(clean_tag(name).upper())
+            if not name:
+                name = self.asset_tag or self.serial
+        else:
+            name = self.name
 
         return self.search(f'hardware?filter={{"name":"{name}"}}')
 
@@ -737,20 +739,28 @@ class Hardware(SnipeDataObject):
         return self
 
     def get_by_asset_tag(self, asset_tag="") -> Self:
-        asset_tag_clean = html.escape(clean_tag(asset_tag).upper() or self.asset_tag)
+        if asset_tag:
+            asset_tag = html.escape(clean_tag(asset_tag).upper())
+        else:
+            asset_tag = self.asset_tag
+
         if not asset_tag:
-            logging.debug(f"No valid asset tag: {asset_tag}")
+            logging.debug(f"No valid asset tag {asset_tag}")
             return self
 
-        return self.search(f"hardware/bytag/{asset_tag_clean}")
+        return self.search(f"hardware/bytag/{asset_tag}")
 
     def get_by_serial(self, serial="") -> Self:
-        serial_clean = clean_tag(serial).upper() if serial else self.serial
-        if not serial_clean:
+        if serial:
+            serial = html.escape(clean_tag(serial).upper())
+        else:
+            serial = self.serial
+
+        if not serial:
             logging.debug(f"No valid serial number {serial}")
             return self
 
-        return self.search(f"hardware/byserial/{serial_clean}")
+        return self.search(f"hardware/byserial/{serial}")
 
     def checkout_to_user(self, user: Users, expected_checkin: str = "", checkout_at: str = "", note: str = "") -> Self:
         if not user.id:

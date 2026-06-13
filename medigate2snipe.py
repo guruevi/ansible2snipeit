@@ -256,7 +256,7 @@ while offset <= count:
                   .populate(asset_config_nonauth)
                   .get_by_asset_tag()
                   .get_by_serial()
-                  .get_by_mac(device['mac_list'])
+                  .get_by_mac(device['mac_list'], remove_bad_vendors=True)
                   .get_by_name()
                   .store_state())
 
