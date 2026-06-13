@@ -723,7 +723,7 @@ class Hardware(SnipeDataObject):
         else:
             name = self.name
 
-        return self.search(f'hardware', payload={"filter": '{"name": "' + name + '"}')
+        return self.search(f'hardware', payload={"filter": '{"name": "' + name + '"}'})
 
     def get_by_mac(self, mac_addresses: list | None = None, remove_bad_vendors: bool = False) -> Self:
         if mac_addresses is None:
