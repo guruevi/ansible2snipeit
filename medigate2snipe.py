@@ -12,7 +12,7 @@ from medigate_api.rest import ApiException
 from snipeit_api.defaults import DEFAULTS
 from snipeit_api.api import SnipeITApi
 from snipeit_api.helpers import filter_list, filter_list_first, clean_tag, print_progress, \
-    clean_user, clean_edr, clean_mac, get_os_type
+    clean_user, clean_edr, clean_mac, get_os_type, clean_model
 from snipeit_api.models import Hardware, Models, Category, Manufacturers, FieldSets, Locations
 
 logging.basicConfig(level=logging.ERROR)
@@ -226,7 +226,12 @@ while offset <= count:
                             .create())
             model_config['manufacturer_id'] = manufacturer.id
 
-        model = Models(api=snipe_api, name=device['model']).get_by_name().populate(model_config).create()
+        try:
+            model = Models(api=snipe_api, name=clean_model(device['model'])).get_by_name().populate(model_config).create()
+        except ValueError as e:
+            logging.error(f"Model {device['model']} not found. Skipping.")
+            model = Models(api=snipe_api, name="Unknown").get_by_name()
+
         asset_config_nonauth['model_id'] = model.id or DEFAULTS['model_id']
         assert asset_config_nonauth['model_id'] != 0
 

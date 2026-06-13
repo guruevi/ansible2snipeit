@@ -124,6 +124,10 @@ def clean_tag(value: Any) -> str:
     # logging.debug(f"Clean tag: {value}")
     return str(value).strip()
 
+def clean_model(model: str) -> str:
+    if model.startswith('Linux'):
+        return ''
+    return clean_tag(model)
 
 def clean_manufacturer(manufacturer: str):
     if not manufacturer:

@@ -14,7 +14,7 @@ from xmltodict import parse
 from snipeit_api.api import SnipeITApi
 from snipeit_api.defaults import DEFAULTS
 from snipeit_api.helpers import clean_ip, clean_mac, filter_list, clean_tag, clean_user, print_progress, \
-    get_dept_from_ou, validate_os
+    get_dept_from_ou, validate_os, clean_model
 from snipeit_api.models import Hardware, Manufacturers, Models
 
 logging.basicConfig(level=logging.INFO)
@@ -137,7 +137,7 @@ def process_entry(properties, net_info, edr_info, api: SnipeITApi):
         'eol'] = 60 if 'dell' in mfg_name.lower() else 36 if 'lenovo' in mfg_name.lower() or 'hp' in mfg_name.lower() else 84 if 'apple' in mfg_name.lower() else 0
     model_config['manufacturer_id'] = manufacturer.id
 
-    model = Models(api=api, name=model_name).get_by_name().populate(model_config).create()
+    model = Models(api=api, name=clean_model(model_name)).get_by_name().populate(model_config).create()
     asset_config_auth['model_id'] = model.id or DEFAULTS['model_id']
     assert asset_config_auth['model_id'] != 0
 

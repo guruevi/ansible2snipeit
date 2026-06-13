@@ -6,7 +6,7 @@ from dell_api.__main__ import DellApi
 from requests.exceptions import JSONDecodeError
 from snipeit_api.api import SnipeITApi
 from snipeit_api.defaults import DEFAULTS
-from snipeit_api.helpers import clean_tag
+from snipeit_api.helpers import clean_tag, clean_model
 from snipeit_api.models import Manufacturers, Models
 
 
@@ -47,9 +47,9 @@ def get_dell_warranty(serials: list, manufacturer_id: int, snipeapi: SnipeITApi,
         info[dell_warranty['serviceTag']] = {}
         model_name = dell_warranty['productLineDescription'].replace("Dell System ", "").replace("Dell ", "").title()
         if clean_tag(model_name):
-            model = (Models(api=snipeapi, name=model_name)
+            model = (Models(api=snipeapi, name=clean_model(model_name))
                      .get_by_name()
-                     .populate({"name": model_name,
+                     .populate({"name": clean_model(model_name),
                                 "model_number": dell_warranty['productCode'].upper(),
                                 "manufacturer_id": manufacturer_id,
                                 "category_id": DEFAULTS['category_id'],
