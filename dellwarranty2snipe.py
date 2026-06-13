@@ -6,7 +6,7 @@ from dell_api.__main__ import DellApi
 from requests.exceptions import JSONDecodeError
 from snipeit_api.api import SnipeITApi
 from snipeit_api.defaults import DEFAULTS
-from snipeit_api.helpers import clean_tag, clean_model
+from snipeit_api.helpers import clean_tag, clean_model, setup_logging
 from snipeit_api.models import Manufacturers, Models
 
 
@@ -80,11 +80,11 @@ def get_dell_warranty(serials: list, manufacturer_id: int, snipeapi: SnipeITApi,
 
 
 def main():
-    dell_api = DellApi()
-    logging.basicConfig(level=logging.ERROR)
-
     config = RawConfigParser()
     config.read("settings.conf")
+    setup_logging(config)
+
+    dell_api = DellApi()
     snipeit_apiurl = config.get('snipe-it', 'url')
     snipeit_apikey = config.get('snipe-it', 'apikey')
     snipeapi = SnipeITApi(snipeit_apiurl, snipeit_apikey)

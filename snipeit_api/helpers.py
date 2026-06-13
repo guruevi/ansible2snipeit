@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import re
 import smtplib
+from configparser import RawConfigParser
 from csv import reader
 from datetime import date, timedelta, datetime
 from email import encoders
@@ -715,3 +716,20 @@ def parse_isoformat(date_string):
     if date_string.endswith('Z'):
         date_string = date_string[:-1] + '+00:00'
     return datetime.fromisoformat(date_string)
+
+
+def setup_logging(config: RawConfigParser):
+    """
+    Setup logging level based on config file.
+    :param config: RawConfigParser object
+    """
+    log_level_str = "INFO"
+    if 'logging' in config and 'level' in config['logging']:
+        log_level_str = config['logging']['level'].upper()
+
+    log_level = getattr(logging, log_level_str, logging.INFO)
+    logging.basicConfig(level=log_level)
+    # If the level was already set, basicConfig might not override it if it was already called.
+    # However, for these scripts, it's usually called once at the start.
+    logging.getLogger().setLevel(log_level)
+    logging.debug(f"Logging level set to {log_level_str}")

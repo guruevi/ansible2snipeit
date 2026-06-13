@@ -14,12 +14,12 @@ from xmltodict import parse
 from snipeit_api.api import SnipeITApi
 from snipeit_api.defaults import DEFAULTS
 from snipeit_api.helpers import clean_ip, clean_mac, filter_list, clean_tag, clean_user, print_progress, \
-    get_dept_from_ou, validate_os, clean_model
+    get_dept_from_ou, validate_os, clean_model, setup_logging
 from snipeit_api.models import Hardware, Manufacturers, Models
 
-logging.basicConfig(level=logging.INFO)
 CONFIG = RawConfigParser()
 CONFIG.read("settings.conf")
+setup_logging(CONFIG)
 snipeit_apiurl = CONFIG.get('snipe-it', 'url')
 snipeit_apikey = CONFIG.get('snipe-it', 'apikey')
 DEFAULTS['techs'] = CONFIG.get('snipe-it', 'techs').split(" ")

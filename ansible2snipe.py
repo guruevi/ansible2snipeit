@@ -39,14 +39,15 @@ from jinja2.nativetypes import NativeEnvironment
 from dellwarranty2snipe import get_dell_warranty
 from snipeit_api.api import SnipeITApi
 from snipeit_api.defaults import DEFAULTS
-from snipeit_api.helpers import filter_list, get_dept_from_ou, clean_edr, validate_os, get_os_type
+from snipeit_api.helpers import filter_list, get_dept_from_ou, clean_edr, validate_os, get_os_type, setup_logging
 from snipeit_api.models import Hardware, Manufacturers, Models
 
 version = "0.2"
 CONFIG = RawConfigParser()
-logging.basicConfig(level=logging.ERROR)
+
 # Find a valid settings.conf file.
 CONFIG.read("settings.conf")
+setup_logging(CONFIG)
 if 'snipe-it' not in set(CONFIG):
     logging.debug("No valid CONFIG found in current folder.")
     logging.error(

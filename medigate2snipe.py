@@ -12,13 +12,13 @@ from medigate_api.rest import ApiException
 from snipeit_api.defaults import DEFAULTS
 from snipeit_api.api import SnipeITApi
 from snipeit_api.helpers import filter_list, filter_list_first, clean_tag, print_progress, \
-    clean_user, clean_edr, clean_mac, get_os_type, clean_model
+    clean_user, clean_edr, clean_mac, get_os_type, clean_model, setup_logging
 from snipeit_api.models import Hardware, Models, Category, Manufacturers, FieldSets, Locations
 
-logging.basicConfig(level=logging.DEBUG)
 CONFIG = RawConfigParser()
-logging.debug("Checking for a settings.conf ...")
 CONFIG.read("settings.conf")
+setup_logging(CONFIG)
+logging.debug("Checking for a settings.conf ...")
 medigate_apikey = CONFIG.get('medigate', 'apikey')
 medigate_apiurl = CONFIG.get('medigate', 'url')
 snipeit_apiurl = CONFIG.get('snipe-it', 'url')

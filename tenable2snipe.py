@@ -6,15 +6,15 @@ from copy import deepcopy
 from tenable.sc import TenableSC
 from snipeit_api.api import SnipeITApi
 from snipeit_api.defaults import DEFAULTS
-from snipeit_api.helpers import filter_list
+from snipeit_api.helpers import filter_list, setup_logging
 from snipeit_api.models import Hardware
 
 
 def main():
     config = RawConfigParser()
-    logging.basicConfig(level=logging.ERROR)
-    logging.debug("Checking for a settings.conf ...")
     config.read("settings.conf")
+    setup_logging(config)
+    logging.debug("Checking for a settings.conf ...")
     snipeit_apiurl = config.get('snipe-it', 'url')
     snipeit_apikey = config.get('snipe-it', 'apikey')
     snipe_api = SnipeITApi(snipeit_apiurl, snipeit_apikey)

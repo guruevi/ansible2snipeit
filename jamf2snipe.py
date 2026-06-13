@@ -14,13 +14,13 @@ from requests import Response, get, post, patch
 from snipeit_api.api import SnipeITApi
 from snipeit_api.defaults import DEFAULTS
 from snipeit_api.helpers import filter_list, query_apple_warranty, print_progress, clean_tag, clean_user, \
-    parse_isoformat
+    parse_isoformat, setup_logging
 from snipeit_api.models import Hardware, Models, Manufacturers, Users
 
-logging.basicConfig(level=logging.INFO)
 CONFIG = RawConfigParser()
-logging.debug("Checking for a settings.conf ...")
 CONFIG.read("settings.conf")
+setup_logging(CONFIG)
+logging.debug("Checking for a settings.conf ...")
 snipeit_apiurl = CONFIG.get('snipe-it', 'url')
 snipeit_apikey = CONFIG.get('snipe-it', 'apikey')
 # Get the techs from the config file
