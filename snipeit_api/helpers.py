@@ -44,6 +44,7 @@ def clean_edr(value: Any) -> str:
         "Malwarebytes Client",
         "McAfee Agent",
         "Microsoft Defender ATP",
+        "Microsoft Defender for Endpoint",
         "N/A (Manual)",
         "Norton 360",
         "SentinelOne",
@@ -52,6 +53,7 @@ def clean_edr(value: Any) -> str:
         "Tenable Nessus",
         "Trend Micro Security Agent",
         "XProtect"
+        "ClamAV"
     ]
 
     if value in valid_options:
