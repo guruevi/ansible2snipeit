@@ -611,8 +611,6 @@ class Hardware(SnipeDataObject):
 
         if key == 'name':
             value: str = clean_tag(value).upper()
-            if not value:
-                value = self.asset_tag or self.serial or "Unknown"
 
         if key == 'asset_tag':
             value: str = clean_tag(value).upper()
@@ -668,11 +666,14 @@ class Hardware(SnipeDataObject):
         available_fields = []
         logging.debug(new_macs)
         for cf in self.custom_fields.values():
+            # If it is a MAC field
             if cf['field_format'] == 'MAC':
+                # If we already have a value for this field, and it matches
                 if cf['value'] and cf['value'].upper() in new_macs:
                     # Remove the MAC address from the list
                     new_macs.remove(cf['value'].upper())
-                if not cf['value']:
+                else:
+                    # Add the field to the list of available fields
                     available_fields.append(cf['field'])
 
         for afield in available_fields:
@@ -717,9 +718,7 @@ class Hardware(SnipeDataObject):
 
     def get_by_name(self, name: str = "") -> Self:
         if name:
-            name = html.escape(clean_tag(name).upper())
-            if not name:
-                name = self.asset_tag or self.serial
+            name = html.escape(name)
         else:
             name = self.name
 

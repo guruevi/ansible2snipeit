@@ -248,15 +248,13 @@ while offset <= count:
         hostname = hostname.split(".")[0].upper()
 
         new_hw = (Hardware(api=snipe_api,
-                           asset_tag=device['uid'],
                            serial=serial_number,
                            name=hostname,
-                           model_id=asset_config_nonauth['model_id'],
                            custom_fields=copy.deepcopy(DEFAULTS['custom_fields']))
                   .populate(asset_config_nonauth)
-                  .get_by_asset_tag()
                   .get_by_serial()
                   .get_by_mac(device['mac_list'], remove_bad_vendors=True)
+                  .get_by_asset_tag(device['uid'])
                   .get_by_name()
                   .store_state())
 

@@ -148,7 +148,7 @@ def process_entry(properties, net_info, edr_info, api: SnipeITApi):
                        custom_fields=copy.deepcopy(DEFAULTS['custom_fields']))
               .populate(asset_config_nonauth)
               .get_by_serial()
-              .get_by_mac(filter_list(net_info[computer_serial]['mac']))
+              .get_by_mac(filter_list(net_info[computer_serial]['mac']), remove_bad_vendors=True)
               .get_by_asset_tag()
               .get_by_name()
               .store_state())
