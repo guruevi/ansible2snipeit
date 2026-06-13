@@ -39,6 +39,8 @@ class Actions:
     checkout: bool = False
     checkin: bool = False
     bulk_selectable: bool = False
+    create_asset: bool = False
+    audit: bool = False
 
 @dataclass_json
 @dataclass

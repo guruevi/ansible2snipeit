@@ -79,7 +79,7 @@ def csv2snipe(file: str) -> str:
 
     # Check the header
     valid_header = ["Asset Name", "Asset Tag", "Serial", "Category", "MAC Address 1", "IP Address", "Domain",
-                    "Department", "Last User", "Operating System", "CPU", "Internet", "EDR", "Management", "Org. Unit",
+                    "Department", "Last User", "Operating System", "CPU", "EDR", "Management", "Org. Unit",
                     "Lab"]
     if lines[0][0:len(valid_header)] != valid_header:
         logging.error(f"Invalid header: {lines[0:len(valid_header)]}, this does not seem like a valid inventory file")

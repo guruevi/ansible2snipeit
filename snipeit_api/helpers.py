@@ -125,9 +125,10 @@ def clean_tag(value: Any) -> str:
     return str(value).strip()
 
 def clean_model(model: str) -> str:
-    if model.startswith('Linux'):
-        return ''
-    return clean_tag(model)
+    model = clean_tag(model)
+    if not model or model.startswith('Linux'):
+        return 'Unknown'
+    return model
 
 def clean_manufacturer(manufacturer: str):
     if not manufacturer:

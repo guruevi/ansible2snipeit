@@ -15,7 +15,7 @@ from snipeit_api.helpers import filter_list, filter_list_first, clean_tag, print
     clean_user, clean_edr, clean_mac, get_os_type, clean_model
 from snipeit_api.models import Hardware, Models, Category, Manufacturers, FieldSets, Locations
 
-logging.basicConfig(level=logging.ERROR)
+logging.basicConfig(level=logging.DEBUG)
 CONFIG = RawConfigParser()
 logging.debug("Checking for a settings.conf ...")
 CONFIG.read("settings.conf")
@@ -55,10 +55,10 @@ fields = [
     "domains",
     "endpoint_security_names",
     # "equipment_class",
-    "handles_pii",
+    # "handles_pii",
     # "http_hostnames",
     # "hw_version",
-    "internet_communication",
+    # "internet_communication",
     # "ip_assignment_list",
     # "ip_list",
     "last_domain_user",
@@ -81,7 +81,7 @@ fields = [
     # "os_subcategory",
     "os_version",
     # "other_hostnames",
-    "phi",
+    # "phi",
     # "protocol_location_list",
     # "retired",
     "serial_number",
@@ -291,32 +291,6 @@ while offset <= count:
         # Move from pending to deployed
         if 'UR' in new_hw.get_custom_field("Domain") and new_hw.status_id == DEFAULTS['status_id_pending']:
             new_hw.status_id = DEFAULTS['status_id_deployed']
-
-        # Make sure we don't overwrite existing values
-        if new_hw.get_custom_field("PII") != "Yes":
-            new_hw.set_custom_field("PII", device['handles_pii'])
-
-        # Values are "Yes", "No", "Unidirectional Outbound"
-        # Don't overwrite a specific value with a general value
-        new_hw.set_custom_field("Internet", device['internet_communication'])
-
-        # Values are "Transmits", "Stores", "Transmits and Stores"
-        if device['phi']:
-            transmit = False
-            stores = False
-            if "Transmits" in new_hw.get_custom_field("PHI") or "Transmits" in device['phi']:
-                transmit = True
-            if "Stores" in new_hw.get_custom_field("PHI") or "Stores" in device['phi']:
-                stores = True
-            if transmit or stores:
-                new_hw.set_custom_field("PII", "Yes")
-
-            if transmit and stores:
-                new_hw.set_custom_field("PHI", "Transmits, Stores")
-            elif transmit:
-                new_hw.set_custom_field("PHI", "Transmits")
-            elif stores:
-                new_hw.set_custom_field("PHI", "Stores")
 
         # Add the new values to the old values
         new_hw.set_custom_field("Management", ', '.join(

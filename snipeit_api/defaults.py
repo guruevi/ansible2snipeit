@@ -59,21 +59,6 @@ DEFAULTS = {
             'value': '',
             'field_format': 'ANY',
             'element': 'text'},
-        'Internet': {
-            'field': '_snipeit_internet_21',
-            'value': '',
-            'field_format': 'ANY',
-            'element': 'radio'},
-        'PII': {
-            'field': '_snipeit_pii_22',
-            'value': '',
-            'field_format': 'ANY',
-            'element': 'radio'},
-        'PHI': {
-            'field': '_snipeit_phi_23',
-            'value': '',
-            'field_format': 'ANY',
-            'element': 'checkbox'},
         'EDR': {
             'field': '_snipeit_edr_24',
             'value': '',

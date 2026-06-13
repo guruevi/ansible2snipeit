@@ -376,12 +376,6 @@ def main():
         if jamf_os_build.endswith(".0"):
             jamf_os_build = jamf_os_build[:-2]
         new_hw.set_custom_field("OS Build", jamf_os_build)
-        # Values are "Yes", "No", "Unidirectional Outbound"
-        # Don't overwrite a specific value with a general value
-        if new_hw.get_custom_field("Internet") != "Unidirectional Outbound":
-            # JAMF lives in the cloud, so Internet is required
-            if new_hw.get_custom_field("Internet") != "Yes":
-                new_hw.set_custom_field("Internet", "Yes")
 
         # All Apple devices come with XProtect
         if not jamf_licensed_software:
