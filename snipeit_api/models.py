@@ -672,9 +672,12 @@ class Hardware(SnipeDataObject):
                 if cf['value'] and cf['value'].upper() in new_macs:
                     # Remove the MAC address from the list
                     new_macs.remove(cf['value'].upper())
-                else:
+                elif cf['value']:
                     # Add the field to the list of available fields
                     available_fields.append(cf['field'])
+                else:
+                    # Make this the first field to be set, since it is empty
+                    available_fields.insert(0, cf['field'])
 
         for afield in available_fields:
             if new_macs:
