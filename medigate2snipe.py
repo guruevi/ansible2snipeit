@@ -241,6 +241,10 @@ while offset <= count:
             locationObject = defaultLocationObject
 
         hostname = device['device_name']
+        if not hostname:
+            logging.error(f"No hostname found for device with serial number {serial_number}. Skipping.")
+            continue
+
         hostname = hostname.split("\\")
         hostname = hostname[int(len(hostname) > 1)]
 

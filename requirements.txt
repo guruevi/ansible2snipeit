@@ -2,7 +2,7 @@ annotated-types==0.7.0
 dataclasses-json==0.6.7
 dell-warranty-api==1.10.0
 Flask==3.1.3
-medigate-api@ git+https://github.com/guruevi/medigate_api.git@d30133e59e66871f4fae08ca5fdb0f39d4da3ac4
+medigate-api@ git@gitlab.urmc-sh.rochester.edu:orit/infrastructure/medigate_api.git@75df8a817600005e852799df01a8591f7eb51f21
 pyldap==3.0.0.post1
 requests-cache==1.3.2
 xlrd==2.0.2

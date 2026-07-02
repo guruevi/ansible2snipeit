@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Device Trust Score</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="card">
+  <h1>Device Trust Score</h1>
+
+  <div id="loading">
+    <div class="spinner"></div>
+    <div class="loading-title">Checking your device security status&hellip;</div>
+    <div class="loading-sub">Looking up your device in the security inventory</div>
+  </div>
+
+  <div id="result"></div>
+
+  <div id="error-state">
+    <div class="state-icon">⚠️</div>
+    <p><strong>Could not retrieve trust score</strong></p>
+    <p class="muted" id="error-msg">An unexpected error occurred. Please try again later.</p>
+  </div>
+</div>
+
+<!-- Help modal -->
+<div id="modal-overlay" class="modal-overlay" hidden aria-modal="true" role="dialog" aria-labelledby="modal-title">
+  <div class="modal-box">
+    <button class="modal-close" id="modal-close" aria-label="Close">&times;</button>
+    <h2 id="modal-title">Request Help from Research Support</h2>
+
+    <div id="modal-form-wrap">
+      <p class="muted">Your device details will be included automatically. Just tell us how we can help.</p>
+      <form id="help-form" novalidate>
+        <label for="field-name">Your name</label>
+        <input type="text" id="field-name" placeholder="Optional" autocomplete="name">
+
+        <label for="field-email">Your email <span class="required">*</span></label>
+        <input type="email" id="field-email" placeholder="you@rochester.edu" autocomplete="email" required>
+
+        <label for="field-message">How can we help?</label>
+        <textarea id="field-message" rows="4" placeholder="Describe what you need help with, or leave blank to just send your device details."></textarea>
+
+        <p class="form-error" id="form-error" hidden></p>
+        <button type="submit" class="btn-primary" id="form-submit">Send Request</button>
+      </form>
+    </div>
+
+    <div id="modal-success" hidden>
+      <div class="state-icon">✅</div>
+      <p><strong>Request sent!</strong></p>
+      <p class="muted">Research Support will be in touch with you soon.</p>
+      <button class="btn-primary" id="modal-done">Done</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var _data = null;
+
+  // Forward ?ip= override to the API if present
+  var params = new URLSearchParams(window.location.search);
+  var apiUrl = '/api/score' + (params.has('ip') ? '?ip=' + encodeURIComponent(params.get('ip')) : '');
+
+  fetch(apiUrl)
+    .then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(function (data) {
+      _data = data;
+      render(data);
+    })
+    .catch(function (err) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('error-msg').textContent = err.message || 'Unexpected error.';
+      document.getElementById('error-state').style.display = 'flex';
+    });
+
+  // ── Helpers ──────────────────────────────────────────────────
+
+  function esc(str) {
+    if (str == null) return '';
+    return String(str)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  // ── Render ───────────────────────────────────────────────────
+
+  function render(data) {
+    document.getElementById('loading').style.display = 'none';
+    var el = document.getElementById('result');
+
+    if (!data.found) {
+      el.innerHTML = notFoundHTML(data.client_ip);
+    } else {
+      el.innerHTML = resultHTML(data);
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          var bar = document.getElementById('score-bar');
+          if (bar) bar.style.width = data.score + '%';
+        });
+      });
+    }
+    el.style.display = 'block';
+  }
+
+  function notFoundHTML(ip) {
+    return '<div class="state-block">'
+      + '<div class="state-icon">🔍</div>'
+      + '<p><strong>Device not found</strong></p>'
+      + '<p class="muted">No device with IP <code>' + esc(ip) + '</code> was found in the '
+      + 'security inventory. This usually means the device has not been seen recently on the '
+      + 'monitored network, or its IP was not recorded.</p>'
+      + '<div class="tip-box">💡 If you believe this is an error, contact the Information Security Office '
+      + 'or IT Help Desk and provide your IP: <strong>' + esc(ip) + '</strong></div>'
+      + helpRow()
+      + '</div>';
+  }
+
+  function resultHTML(d) {
+    var html = '<div class="ip-line">Evaluated for: <strong>' + esc(d.client_ip) + '</strong></div>';
+
+    // Device info strip
+    var info = [];
+    if (d.device_name)                      info.push('<span>🖥 <strong>' + esc(d.device_name) + '</strong></span>');
+    if (d.serial_number)                    info.push('<span>S/N: ' + esc(d.serial_number) + '</span>');
+    var os = [d.os_name, d.os_version].filter(Boolean).join(' ');
+    if (os)                                 info.push('<span>' + esc(os) + '</span>');
+    var hw = [d.manufacturer, d.model].filter(Boolean).join(' ');
+    if (hw)                                 info.push('<span>' + esc(hw) + '</span>');
+    if (d.site_name)                        info.push('<span>📍 ' + esc(d.site_name) + '</span>');
+    if (info.length) html += '<div class="device-info">' + info.join('') + '</div>';
+
+    // Score ring
+    html += '<div class="score-ring">'
+      + '<div class="score-number" style="color:' + esc(d.category.color) + '">' + d.score + ' / 100</div>'
+      + '</div>';
+
+    // Progress bar
+    html += '<div class="progress-bar-bg">'
+      + '<div class="progress-bar-fill" id="score-bar" style="background:' + esc(d.category.color) + ';width:0"></div>'
+      + '</div>';
+
+    // Category badge
+    html += '<div class="category-row">'
+      + '<span class="category-badge" style="background:' + esc(d.category.color) + '">'
+      + esc(d.category.badge) + ' \u2013 ' + esc(d.category.name)
+      + '</span></div>'
+      + '<p class="category-summary">' + esc(d.category.summary) + '</p>';
+
+    // Security integrations
+    html += '<h2>Security Integrations</h2>';
+    for (var i = 0; i < d.sources.length; i++) {
+      html += sourceRow(d.sources[i]);
+    }
+
+    // Penalties
+    if (d.penalties && d.penalties.length) {
+      html += '<h2>Issues of Concern</h2>';
+      for (var j = 0; j < d.penalties.length; j++) {
+        html += penaltyRow(d.penalties[j]);
+      }
+    }
+
+    html += helpRow();
+    return html;
+  }
+
+  function sourceRow(s) {
+    var icon, ptColor;
+    if (s.status === 'full') {
+      icon = '✅'; ptColor = '#2e7d32';
+    } else if (s.status === 'partial') {
+      icon = '⚠️'; ptColor = '#f57f17';
+    } else {
+      icon = '❌'; ptColor = '#b71c1c';
+    }
+
+    var ptText = s.points_earned + '/' + s.points_max + ' pts';
+
+    var html = '<div class="source-row">'
+      + '<div class="source-icon">' + icon + '</div>'
+      + '<div class="source-body">'
+      + '<div class="source-title">' + esc(s.name)
+      + ' <span class="source-pts" style="color:' + ptColor + '">(' + ptText + ')</span></div>'
+      + '<div class="source-desc">' + esc(s.description) + '</div>';
+
+    if (s.warning) {
+      html += '<div class="warn-box">⚠ ' + esc(s.warning) + '</div>';
+    }
+    if (s.status !== 'full') {
+      html += '<div class="tip-box">💡 <strong>How to improve:</strong> ' + esc(s.how_to_improve) + '</div>';
+    }
+    html += '</div></div>';
+    return html;
+  }
+
+  function penaltyRow(p) {
+    return '<div class="source-row penalty-row">'
+      + '<div class="source-icon">🚨</div>'
+      + '<div class="source-body">'
+      + '<div class="source-title">' + esc(p.name) + '</div>'
+      + '<div class="source-desc">' + esc(p.description) + '</div>'
+      + '<div class="tip-box">💡 <strong>Action required:</strong> ' + esc(p.how_to_improve) + '</div>'
+      + '</div></div>';
+  }
+
+  function helpRow() {
+    return '<div class="help-row">'
+      + '<button class="help-btn" id="help-btn">✉ Request Help from Research Support</button>'
+      + '</div>';
+  }
+
+  // ── Modal ────────────────────────────────────────────────────
+
+  var overlay = document.getElementById('modal-overlay');
+
+  document.getElementById('result').addEventListener('click', function (e) {
+    if (e.target && e.target.id === 'help-btn') openModal();
+  });
+
+  // Also wire not-found help button (rendered before result div is populated)
+  document.addEventListener('click', function (e) {
+    if (e.target && e.target.id === 'help-btn') openModal();
+  });
+
+  overlay.addEventListener('click', function (e) {
+    if (e.target === overlay) closeModal();
+  });
+
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  document.getElementById('modal-done').addEventListener('click', closeModal);
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeModal();
+  });
+
+  function openModal() {
+    overlay.hidden = false;
+    document.getElementById('field-email').focus();
+  }
+
+  function closeModal() {
+    overlay.hidden = true;
+    document.getElementById('help-form').reset();
+    document.getElementById('modal-form-wrap').hidden = false;
+    document.getElementById('modal-success').hidden = true;
+    document.getElementById('form-error').hidden = true;
+    var btn = document.getElementById('form-submit');
+    btn.disabled = false;
+    btn.textContent = 'Send Request';
+  }
+
+  document.getElementById('help-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var email = document.getElementById('field-email').value.trim();
+    if (!email) {
+      var errEl = document.getElementById('form-error');
+      errEl.textContent = 'Please enter your email address.';
+      errEl.hidden = false;
+      return;
+    }
+
+    var btn = document.getElementById('form-submit');
+    btn.disabled = true;
+    btn.textContent = 'Sending\u2026';
+    document.getElementById('form-error').hidden = true;
+
+    fetch('/api/help', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name:      document.getElementById('field-name').value.trim(),
+        email:     email,
+        message:   document.getElementById('field-message').value.trim(),
+        client_ip: _data ? _data.client_ip : '',
+      }),
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (resp) {
+      if (resp.ok) {
+        document.getElementById('modal-form-wrap').hidden = true;
+        document.getElementById('modal-success').hidden = false;
+      } else {
+        var errEl = document.getElementById('form-error');
+        errEl.textContent = resp.error || 'Failed to send. Please try again.';
+        errEl.hidden = false;
+        btn.disabled = false;
+        btn.textContent = 'Send Request';
+      }
+    })
+    .catch(function () {
+      var errEl = document.getElementById('form-error');
+      errEl.textContent = 'Network error. Please try again.';
+      errEl.hidden = false;
+      btn.disabled = false;
+      btn.textContent = 'Send Request';
+    });
+  });
+})();
+</script>
+</body>
+</html>
