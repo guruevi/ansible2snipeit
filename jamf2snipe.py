@@ -322,8 +322,8 @@ def main():
                            model_id=model.id
                            )
                   .get_by_serial()
-                  .get_by_mac(raw_macs)
                   .get_by_asset_tag()
+                  .get_by_mac(raw_macs)
                   .store_state()
                   .populate_mac(raw_macs))
 
