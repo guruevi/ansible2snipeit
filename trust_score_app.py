@@ -95,10 +95,10 @@ def _ctx(device: dict) -> dict:
 def _detect_ad(device, ctx):
     return any(d in ("ur.rochester.edu", "urmc-sh.rochester.edu") for d in ctx["domains"])
 
-def _detect_crowdstrike(device, ctx):
+def _detect_edr(device, ctx):
     return any("crowdstrike falcon" in e for e in ctx["edr"])
 
-def _detect_tenable(device, ctx):
+def _detect_vulnscan(device, ctx):
     in_inventory = (
         any("tenable" in i for i in ctx["interfaces"])
         or any("tenable" in s for s in ctx["mgmt"] + ctx["edr"])
@@ -145,40 +145,38 @@ DATA_SOURCES = {
             "to request domain enrollment for your device."
         ),
     },
-    "CrowdStrike EDR": {
+    "EDR (Endpoint Detection and Response)": {
         "points":        25,
         "points_stale":  12,
         "stale_field":   "edr_last_scan_time",
         "stale_days":    7,
         "stale_warning": "Last scan was {days} ago — agent may be unhealthy.",
-        "detect":  _detect_crowdstrike,
-        "description": "CrowdStrike Falcon endpoint detection and response agent is installed and scanning.",
+        "detect":  _detect_edr,
+        "description": "An approved endpoint detection and response agent is installed and scanning.",
         "how_to_improve": (
             "Install the CrowdStrike Falcon sensor. Submit a request via the IT portal "
             "or contact your departmental IT support to get the installer."
         ),
     },
-    "Tenable": {
+    "Vulnerability Detection": {
         "points":        25,
         "points_stale":  12,
         "stale_field":   "last_scan_time",
         "stale_days":    90,
         "stale_warning": "Last scan was {days} ago — device may be out of scan range.",
-        "detect":  _detect_tenable,
-        "description": "Your device is enrolled in the Tenable vulnerability management program.",
+        "detect":  _detect_vulnscan,
+        "description": "Your device is scanned by a vulnerability detection system.",
         "how_to_improve": (
-            "Ensure your device is reachable by the Tenable scanner on the UR network. "
-            "Contact the Information Security Office to have your device added to scan scope."
+            "Ensure your device is reachable by the Tenable scanner on the UR network or install the Tenable agent."
+            "Contact the Information Security Office to have your device added to the scan scope."
         ),
     },
-    "SCCM / JAMF": {
+    "Managed Device": {
         "points": 25,
         "detect": _detect_mdm,
-        "description": "Your device is managed by SCCM (Windows) or JAMF (macOS/iOS).",
+        "description": "Your device is managed by a device management tool.",
         "how_to_improve": (
-            "Enroll your device in the University endpoint management platform. "
-            "Windows users: contact the Help Desk for SCCM enrollment. "
-            "Mac users: contact the Help Desk for JAMF enrollment."
+            "Enroll your device in one of the University endpoint management platforms. "
         ),
     },
     "Device Infected": {
@@ -277,6 +275,7 @@ def lookup_device(ip: str) -> dict | None:
         return None
     if not response.devices:
         return None
+
     return response.devices[0]
 
 

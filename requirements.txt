@@ -2,14 +2,14 @@ annotated-types==0.7.0
 dataclasses-json==0.6.7
 dell-warranty-api==1.10.0
 Flask==3.1.3
-medigate-api@ git@gitlab.urmc-sh.rochester.edu:orit/infrastructure/medigate_api.git@75df8a817600005e852799df01a8591f7eb51f21
+medigate-api @ git+https://gitlab.urmc-sh.rochester.edu/orit/infrastructure/medigate_api@75df8a817600005e852799df01a8591f7eb51f21
 pyldap==3.0.0.post1
-requests-cache==1.3.2
+requests-cache==1.3.3
 xlrd==2.0.2
 openpyxl==3.1.5
 oracledb~=4.0.1
 typing~=3.7.4.3
-typing_extensions~=4.15.0
+typing_extensions~=4.16.0
 requests~=2.34.2
 dnspython~=2.8.0
 requests-ntlm~=1.3.0
