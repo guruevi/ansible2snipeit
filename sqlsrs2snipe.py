@@ -22,7 +22,7 @@ setup_logging(CONFIG)
 snipeit_apiurl = CONFIG.get('snipe-it', 'url')
 snipeit_apikey = CONFIG.get('snipe-it', 'apikey')
 DEFAULTS['techs'] = CONFIG.get('snipe-it', 'techs').split(" ")
-
+DEFAULTS['ignore_companies'] = CONFIG.get('snipe-it', 'ignore_companies').split(",")
 snipe_api = SnipeITApi(url=snipeit_apiurl, api_key=snipeit_apikey)
 
 
@@ -153,6 +153,9 @@ def process_entry(properties, net_info, edr_info, api: SnipeITApi):
               .get_by_name()
               .store_state())
 
+    if new_hw.company_id in DEFAULTS['ignore_companies']:
+        return
+
     new_hw.populate(asset_config_auth).populate_mac(filter_list(net_info[computer_serial]['mac']))
 
     new_storage = get_int('d:Details_Table0_DiskSpaceMB', properties)
@@ -182,7 +185,7 @@ def process_entry(properties, net_info, edr_info, api: SnipeITApi):
         new_hw.set_custom_field("Org. Unit", ou)
         new_hw.set_custom_field("Department", get_dept_from_ou(ou))
 
-    if last_user:
+    if last_user and last_user not in DEFAULTS['techs']:
         new_hw.set_custom_field("Last User", last_user)
 
     try:

@@ -23,8 +23,9 @@ medigate_apikey = CONFIG.get('medigate', 'apikey')
 medigate_apiurl = CONFIG.get('medigate', 'url')
 snipeit_apiurl = CONFIG.get('snipe-it', 'url')
 snipeit_apikey = CONFIG.get('snipe-it', 'apikey')
-# Get the techs from the config file
-DEFAULTS['techs'] = CONFIG.get('snipe-it', 'techs').split(" ")
+# Get the techs from the config file - this is used by the API
+DEFAULTS['techs'] = CONFIG.get('snipe-it', 'techs', fallback='').split(" ")
+DEFAULTS['ignore_companies'] = CONFIG.get('snipe-it', 'ignore_companies', fallback='').split(",")
 # Get the number of days from the environment variable
 DEFAULTS['days'] = int(getenv('DAYS', 1))  # Default to 1 day if not set
 DEFAULTS['first_or_last'] = getenv('FIRST_OR_LAST', 'last')  # Default to last if not set
@@ -180,10 +181,13 @@ while offset <= count:
         }
         # Mapping from Claroty xDome (key) to Snipe-IT custom fields (tuple with field name, default value and callable to
         # transform the value)
+        last_user = clean_user(filter_list_first(device['authentication_user_list'], [device['last_domain_user']]))
+        if not last_user or last_user in DEFAULTS['techs']:
+            last_user = ''
         asset_config_nonauth = {
             "status_id": DEFAULTS['status_id_pending'],
             "model_id": DEFAULTS['model_id'],
-            "_snipeit_last_user_13": clean_user(filter_list_first(device['authentication_user_list'], [device['last_domain_user']])),
+            "_snipeit_last_user_13": last_user,
             "_snipeit_operating_system_14": device['os_name'],
             "_snipeit_os_version_15": device['os_version'],
             "_snipeit_os_build_16": device['os_revision'],
@@ -261,6 +265,9 @@ while offset <= count:
                   .get_by_asset_tag(device['uid'])
                   .get_by_name()
                   .store_state())
+
+        if new_hw.company_id in CONFIG.get('snipe-it', 'ignore_companies').split(","):
+            continue
 
         # Populate all the custom fields
         new_hw.populate(asset_config_auth).populate_mac(device['mac_list'])
