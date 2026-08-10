@@ -52,8 +52,9 @@ def clean_edr(value: Any) -> str:
         "Tanium Client",
         "Tenable Nessus",
         "Trend Micro Security Agent",
-        "XProtect"
-        "ClamAV"
+        "XProtect",
+        "ClamAV",
+        "MDOP MBAM"
     ]
 
     if value in valid_options:
