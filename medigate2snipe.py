@@ -33,7 +33,7 @@ if DEFAULTS['first_or_last'] not in ['first', 'last']:
     DEFAULTS['first_or_last'] = 'last'
 # Set first_or_last to first_seen_list or last_seen_list
 DEFAULTS['first_or_last'] = f"{DEFAULTS['first_or_last']}_seen_list"
-
+DEFAULTS['ignore_companies'] = [int(x.strip()) for x in CONFIG.get('snipe-it', 'ignore_companies').split(',') if x.strip()]
 snipe_api = SnipeITApi(url=snipeit_apiurl, api_key=snipeit_apikey)
 defaultLocationObject = Locations(api=snipe_api, name="Unknown").get_by_name()
 
@@ -266,7 +266,7 @@ while offset <= count:
                   .get_by_name()
                   .store_state())
 
-        if new_hw.company_id in CONFIG.get('snipe-it', 'ignore_companies').split(","):
+        if new_hw.company_id in DEFAULTS['ignore_companies']:
             continue
 
         # Populate all the custom fields
